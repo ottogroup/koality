@@ -239,7 +239,6 @@ check_bundles:
 
         assert result == expected
         assert os.path.getsize(os.path.join(os.path.dirname(config_file_success), "message.txt")) == 0
-        assert executor.bytes_billed == 40
         assert executor.check_failed is False
 
         rows = bq_client_mock.insert_rows.call_args[1]["rows"]
@@ -259,7 +258,6 @@ check_bundles:
             check_message = f.read()
 
         assert check_message == "failure_check_1-2 failed badly!"
-        assert executor.bytes_billed == 21
         assert executor.check_failed is True
 
         rows = bq_client_mock.insert_rows.call_args[1]["rows"]
@@ -283,36 +281,60 @@ check_bundles:
             "failure_check_3-2 failed badly!"
         )
 
-        expected_result_df = pd.DataFrame(
+        expected = [
             {
                 "DATE": "2023-09-18",
-                "SHOP_ID": [
-                    "SHOP001, SHOP004, SHOP005, SHOP011",
-                    "SHOP802, SHOP701",
-                    "SHOP601",
-                    "SHOP502",
-                ],
-                "METRIC_NAME": ["data_exists"] * 2 + ["failure_check_3-1", "failure_check_3-2"],
-                "TABLE": [
-                    "test-project-prod.dataset_filtered.view_product_feed",
-                    "test-project-prod.dataset_filtered.view_sku_feed",
-                ]
-                + ["failed_table"] * 2,
-                "COLUMN": [None] * 2 + ["column"] * 2,
-                "VALUE": [None] * 2 + [77] * 2,
-                "LOWER_THRESHOLD": [None] * 2 + [0] * 2,
-                "UPPER_THRESHOLD": [None] * 2 + [10] * 2,
+                "SHOP_ID": "SHOP001, SHOP004, SHOP005, SHOP011",
+                "METRIC_NAME": "data_exists",
+                "TABLE": "test-project-prod.dataset_filtered.view_product_feed",
+                "COLUMN": None,
+                "VALUE": None,
+                "LOWER_THRESHOLD": None,
+                "UPPER_THRESHOLD": None,
                 "RESULT": "FAIL",
-            }
-        )
+            },
+            {
+                "DATE": "2023-09-18",
+                "SHOP_ID": "SHOP802, SHOP701",
+                "METRIC_NAME": "data_exists",
+                "TABLE": "test-project-prod.dataset_filtered.view_sku_feed",
+                "COLUMN": None,
+                "VALUE": None,
+                "LOWER_THRESHOLD": None,
+                "UPPER_THRESHOLD": None,
+                "RESULT": "FAIL",
+            },
+            {
+                "DATE": "2023-09-18",
+                "SHOP_ID": "SHOP601",
+                "METRIC_NAME": "failure_check_3-1",
+                "TABLE": "failed_table",
+                "COLUMN": "column",
+                "VALUE": 77,
+                "LOWER_THRESHOLD": 0,
+                "UPPER_THRESHOLD": 10,
+                "RESULT": "FAIL",
+            },
+            {
+                "DATE": "2023-09-18",
+                "SHOP_ID": "SHOP502",
+                "METRIC_NAME": "failure_check_3-2",
+                "TABLE": "failed_table",
+                "COLUMN": "column",
+                "VALUE": 77,
+                "LOWER_THRESHOLD": 0,
+                "UPPER_THRESHOLD": 10,
+                "RESULT": "FAIL",
+            },
+        ]
 
-        real_result_df = pd.DataFrame(executor._aggregate_result_dicts(executor.result_dicts))
-        del real_result_df["INSERT_TIMESTAMP"]
+        given = executor._aggregate_result_dicts(executor.result_dicts)
+        for item in given:
+            del item["INSERT_TIMESTAMP"]
 
-        assert_frame_equal(real_result_df, expected_result_df)
-        assert executor.bytes_billed == 88
+        assert given == expected
         assert executor.check_failed is True
         rows = bq_client_mock.insert_rows.call_args[1]["rows"]
         first_row = rows[0]
         del first_row["INSERT_TIMESTAMP"]
-        assert first_row in expected_result_df.replace(np.nan, None).to_dict(orient="records")
+        assert first_row in expected

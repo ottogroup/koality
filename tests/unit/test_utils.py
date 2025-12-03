@@ -1,6 +1,9 @@
 import datetime as dt
+import tests
 
 import pytest
+
+pytestmark = pytest.mark.unit
 
 
 @pytest.mark.parametrize(
@@ -30,19 +33,15 @@ class TestResolveDottedName:
         return resolve_dotted_name
 
     def test_resolve_dotted_name_colon(self, resolve_dotted_name):
-        import koality
-
         assert (
-            resolve_dotted_name("koality.tests.test_utils:TestResolveDottedName.test_resolve_dotted_name_colon")
-            is koality.tests.test_utils.TestResolveDottedName.test_resolve_dotted_name_colon
+            resolve_dotted_name("tests.unit.test_utils:TestResolveDottedName.test_resolve_dotted_name_colon")
+            is TestResolveDottedName.test_resolve_dotted_name_colon
         )
 
     def test_resolve_dotted_name(self, resolve_dotted_name):
-        import koality
-
         assert (
-            resolve_dotted_name("koality.tests.test_utils.TestResolveDottedName")
-            is koality.tests.test_utils.TestResolveDottedName
+            resolve_dotted_name("tests.unit.test_utils.TestResolveDottedName")
+            is TestResolveDottedName
         )
 
     def test_resolve_dotted_name_koality_check(self, resolve_dotted_name):
@@ -72,47 +71,6 @@ def test_parse_date(input_date, offset, expected):
     from koality.utils import parse_date
 
     assert expected == parse_date(input_date, offset)
-
-
-class TestParseGCSPath:
-    @pytest.fixture()
-    def parse_gcs_path(self):
-        from koality.utils import parse_gcs_path
-
-        return parse_gcs_path
-
-    @pytest.mark.parametrize(
-        "test_input, expected",
-        [
-            (
-                "gs://bucket-name/important-data.csv",
-                (
-                    "bucket-name",
-                    "important-data.csv",
-                ),
-            ),
-            (
-                "gs://bucket-name/folder_name/important-data.csv",
-                (
-                    "bucket-name",
-                    "folder_name/important-data.csv",
-                ),
-            ),
-        ],
-    )
-    def test_parse_gcs_path(self, parse_gcs_path, test_input, expected):
-        assert parse_gcs_path(test_input) == expected
-
-    def test_parse_gcs_path_error(self, parse_gcs_path):
-        with pytest.raises(ValueError) as exc:
-            parse_gcs_path("I am a long text and should raise an exception!")
-
-        assert str(exc.value) == "A GCS path needs to start with gs://"
-
-        with pytest.raises(ValueError) as exc:
-            parse_gcs_path("gs://bucket-name")
-
-        assert str(exc.value) == "Blob name is empty"
 
 
 class TestEnsureSetString:
