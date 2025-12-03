@@ -1,0 +1,46 @@
+name: Tests
+
+permissions:
+    id-token: write
+    contents: read
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allow job to be triggered manually.
+  workflow_dispatch:
+
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  tests:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      matrix:
+        os: ["ubuntu-latest"]
+        python-version: ["3.12", "3.13", "3.14"]
+        include:
+          - os: "macos-latest"
+            python-version: "3.14"
+          - os: "windows-latest"
+            python-version: "3.14"
+    name: Python ${{ matrix.python-version }} on OS ${{ matrix.os }}
+    steps:
+      - name: Acquire sources
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install project
+        run: uv sync
+
+      - name: Run tests
+        run: uv run poe test

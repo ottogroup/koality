@@ -1,0 +1,42 @@
+name: Checks
+
+permissions:
+    id-token: write
+    contents: read
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+
+  # Allow job to be triggered manually.
+  workflow_dispatch:
+
+# Cancel in-progress jobs when pushing to the same branch.
+concurrency:
+  cancel-in-progress: true
+  group: ${{ github.workflow }}-${{ github.ref }}
+
+jobs:
+  checks:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        check_command:
+          - check_vulnerable_dependencies
+          - check_unused_dependencies
+          - check_githubactions
+    steps:
+      - name: Acquire sources
+        uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: astral-sh/setup-uv@v6
+
+      - name: Install project
+        run: uv sync
+
+      - name: Run code-style checks
+        run: uv run poe ${{ matrix.check_command }}
