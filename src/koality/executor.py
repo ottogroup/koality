@@ -11,7 +11,7 @@ from google.cloud import bigquery as bq
 # Workaround for typing: https://github.com/python/mypy/issues/12985
 from google.cloud.storage import Client as StorageClient
 
-from src.koality.utils import resolve_dotted_name
+from koality.utils import resolve_dotted_name
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
