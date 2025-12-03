@@ -64,7 +64,7 @@ select = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
-"koality/checks.py" = ["S608"]
+"src/koality/checks.py" = ["S608"]
 
 [tool.poe.tasks]
 # Linting and formatting.
