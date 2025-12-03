@@ -30,6 +30,7 @@ dev = [
     "zizmor>=1.2.2",
     "creosote>=4.0.0",
     "pip-audit>=2.7.3",
+    "poethepoet>=0.37.0",
 ]
 
 [tool.ruff]
@@ -64,6 +65,25 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "koality/checks.py" = ["S608"]
+
+[tool.poe.tasks]
+# Linting and formatting.
+format = [
+    { cmd = "ruff format" },
+    { cmd = "ruff check --fix" },
+]
+lint = [
+    { cmd = "ruff format --check" },
+    { cmd = "ruff check" },
+]
+# Security and dependency checks.
+check_vulnerable_dependencies = "pip-audit"
+check_unused_dependencies = "creosote"
+check_githubactions = "zizmor .github/workflows/"
+# Testing.
+test_unit = "pytest -m unit"
+test_integration = "pytest -m integration"
+test = ["test_unit", "test_integration"]
 
 [project.scripts]
 koality = "koality.cli:cli"
