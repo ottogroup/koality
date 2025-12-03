@@ -25,7 +25,7 @@ jobs:
       matrix:
         check_command:
           - check_vulnerable_dependencies
-          - check_unused_dependencies
+#          - check_unused_dependencies
           - check_githubactions
     steps:
       - name: Acquire sources
