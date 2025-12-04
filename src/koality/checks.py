@@ -5,13 +5,12 @@ import datetime as dt
 import re
 from typing import Any, Iterable, List, Literal, Optional, Tuple
 
-import google.cloud.bigquery
-import numpy as np
-import pandas as pd
-from google.api_core.exceptions import BadRequest
-from google.cloud.bigquery import QueryJob
+import duckdb
 
-from src.koality.utils import format_dynamic, parse_date, to_set
+from koality.models import NumberOrInfinity
+from koality.utils import format_dynamic, parse_date, to_set
+
+type THRESHOLD = NumberOrInfinity | float | Literal["infinity", "-infinity"]
 
 
 class DataQualityCheck(abc.ABC):
@@ -32,15 +31,19 @@ class DataQualityCheck(abc.ABC):
         self,
         table: str,
         check_column: Optional[str] = None,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
         self.table = table
-        self.lower_threshold = lower_threshold
-        self.upper_threshold = upper_threshold
+        if isinstance(lower_threshold, NumberOrInfinity):
+            lower_threshold = lower_threshold.value
+        self.lower_threshold = NumberOrInfinity(lower_threshold)
+        if isinstance(upper_threshold, NumberOrInfinity):
+            upper_threshold = upper_threshold.value
+        self.upper_threshold = NumberOrInfinity(upper_threshold)
         self.monitor_only = monitor_only
         self.extra_info_string = f" {extra_info}" if extra_info else ""
         self.date_info_string = f" ({kwargs['date_info']})" if "date_info" in kwargs else ""
@@ -53,7 +56,7 @@ class DataQualityCheck(abc.ABC):
         self.filters = self.get_filters(kwargs)
 
         self.shop_id = self.filters.get("shop_id", {}).get("value", "ALL_SHOPS")
-        self.date = self.filters.get("date", {}).get("value", dt.date.today().isoformat())
+        self.date_filter_value = self.filters.get("date_filter_value", {}).get("value", dt.date.today().isoformat())
 
         if check_column is None:
             self.check_column = "*"
@@ -85,7 +88,7 @@ class DataQualityCheck(abc.ABC):
 
         return self.shop_id + "_" + self.name
 
-    def data_check(self, bq_client: google.cloud.bigquery.Client) -> dict:
+    def data_check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
         """
         Performs a check if database tables used in the actual check
         contain data.
@@ -94,45 +97,48 @@ class DataQualityCheck(abc.ABC):
         aggregated in order to avoid duplicates in the reported failures.
 
         Args:
-            bq_client: BigQuery client for interacting with BigQuery
+            duckdb_client: DuckDB client for interacting with DuckDB
 
         Returns:
             If there is a table without data, a dict containing information about
             missing data will be returned, otherwise an empty dict indicating that
             data exists.
         """
-        query_job = bq_client.query(self.assemble_data_exists_query())
+        is_empty_table = False
+        empty_table = ""
         try:
-            result = [dict(result) for result in query_job.result()][0]
-        except BadRequest:
+            query_job = duckdb_client.query(self.assemble_data_exists_query())
+        except Exception as e:
             empty_table = f"Error while executing data check query on {self.table}"
         else:
-            self.bytes_billed += query_job.total_bytes_billed
-            empty_table = result["empty_table"]
+            first_row = query_job.fetchone()
+            is_empty_table = bool(first_row and first_row[0])
 
-        if empty_table:
-            date = self.date if hasattr(self, "date") else pd.Timestamp("today").isoformat()
-            self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
-            self.status = "FAIL"
-            return {
-                "DATE": date,
-                "METRIC_NAME": "data_exists",
-                "SHOP_ID": self.shop_id,
-                "TABLE": empty_table,
-            }
-        return {}
+        if not is_empty_table:
+            return {}
 
-    def _check(self, bq_client: google.cloud.bigquery.Client, query: str) -> Tuple[QueryJob, List[dict], Optional[str]]:
-        query_job = bq_client.query(query)
-        query_result = []
+        date = self.date_filter_value if hasattr(self, "date") else dt.datetime.today().isoformat()
+        self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
+        self.status = "FAIL"
+        return {
+            "DATE": date,
+            "METRIC_NAME": "data_exists",
+            "SHOP_ID": self.shop_id,
+            "TABLE": empty_table,
+        }
+
+    def _check(self, duckdb_client: duckdb.DuckDBPyConnection, query: str) -> tuple[list[dict], str | None]:
+        data = []
         error = None
         try:
-            query_result = [dict(result) for result in query_job.result()]
-        except BadRequest as exe:
-            error = str(exe)
-        return query_job, query_result, error
+            result = duckdb_client.query(query)
+        except Exception as e:
+            error = str(e)
+        else:
+            data = [{col: val for col, val in zip(result.columns, row)} for row in result.fetchall()]
+        return data, error
 
-    def check(self, bq_client: google.cloud.bigquery.Client) -> dict:
+    def check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
         """
         Method that is actually performing the check of a data quality check
         object. If the check is set to `monitor_only`, the results of the
@@ -140,29 +146,28 @@ class DataQualityCheck(abc.ABC):
         upper thresholds.
 
         Args:
-            bq_client: BigQuery client for interacting with BigQuery
+            duckdb_client: DuckDB client for interacting with DuckDB
 
         Returns:
             A dict containing all information and the result of the check
         """
 
-        query_job, query_result, error = self._check(bq_client, self.query)
+        result, error = self._check(duckdb_client, self.query)
 
-        check_value = query_result[0][self.name] if query_result else None
-        check_value = float(check_value) if check_value is not None else np.nan
+        check_value = result[0][self.name] if result else None
+        check_value = check_value is not None and float(check_value) or None
 
         if error:
             result = "ERROR"
             self.message = f"{self.shop_id}: Metric {self.name} query errored with {error}"
         else:
-            self.bytes_billed += query_job.total_bytes_billed
             if self.monitor_only:
                 result = "MONITOR_ONLY"
             else:
                 success = self.lower_threshold <= check_value <= self.upper_threshold
                 result = "SUCCESS" if success else "FAIL"
 
-        date = self.date if hasattr(self, "date") else pd.Timestamp("today").isoformat()
+        date = self.date_filter_value if hasattr(self, "date") else dt.datetime.today().isoformat()
         result_dict = {
             "DATE": date,
             "METRIC_NAME": self.name,
@@ -177,7 +182,7 @@ class DataQualityCheck(abc.ABC):
 
         if result_dict["RESULT"] == "FAIL":
             self.message = (
-                f"{self.shop_id}: Metric {self.name} failed on {self.date}{self.date_info_string} for {self.table}."
+                f"{self.shop_id}: Metric {self.name} failed on {self.date_filter_value}{self.date_info_string} for {self.table}."
                 f" Value {format_dynamic(value=result_dict['VALUE'], min_precision=4)} is not between"
                 f" {self.lower_threshold} and {self.upper_threshold}.{self.extra_info_string}"
             )
@@ -274,8 +279,8 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         transformation_name: str,
         table: str,
         check_column: Optional[str] = None,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -354,8 +359,8 @@ class NullRatioCheck(ColumnTransformationCheck):
         self,
         table: str,
         check_column: str,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -404,8 +409,8 @@ class RegexMatchCheck(ColumnTransformationCheck):
         table: str,
         check_column: str,
         regex_to_match: str,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -460,8 +465,8 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         table: str,
         check_column: str,
         value_set: str | bytes | Iterable,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         transformation_name: Optional[str] = None,
         extra_info: Optional[str] = None,
@@ -517,8 +522,8 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         check_column: str,
         value_set: str | bytes | Iterable,
         date_filter_column: str = "BQ_PARTITIONTIME",
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -582,8 +587,8 @@ class DuplicateCheck(ColumnTransformationCheck):
         self,
         table: str,
         check_column: str,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -608,7 +613,7 @@ class CountCheck(ColumnTransformationCheck):
     Checks the number of rows or distinct values of a specific column. It inherits from
     `koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
     descriptions in its super class, except for the `distinct` argument which is added in
-    this sub class.
+    this subclass.
 
     Args:
         distinct: Indicates if the count should count all rows or only distinct values
@@ -635,8 +640,8 @@ class CountCheck(ColumnTransformationCheck):
         table: str,
         check_column: str,
         distinct: bool = False,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -670,31 +675,30 @@ class CountCheck(ColumnTransformationCheck):
         return super().assemble_name()
 
 
-class OccurenceCheck(ColumnTransformationCheck):
+class OccurrenceCheck(ColumnTransformationCheck):
     """
     Checks how often *any* value in a column occurs.
     It inherits from`koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
       descriptions in its super class.
-    Useful e.g. to check for a single product occuring unusually often (likely an error)
+    Useful e.g. to check for a single product occurring unusually often (likely an error)
 
     Args:
-        max_or_min: Check either the maximum or minimum occurence of any value.
+        max_or_min: Check either the maximum or minimum occurrence of any value.
                     If you want to check if any value occurs more than x times, use 'max' and upper_threshold=x
                     If you want to check if any value occurs less than y times, use 'min' and lower_threshold=y
 
     Example:
 
-    OccurenceCheck(
+    OccurrenceCheck(
         max_or_min="max,
         date="2023-01-01",  # optional
         table="my-gcp-project.SHOP01.skufeed_latest",
         shop_id="SHOP01",  # optional
         check_column="sku_id",
-        distinct=True,
         shop_id_filter_column="shop_code",  # optional
         date_filter_column="DATE",  # optional
         lower_threshold=0,
-        upper_threshold=500,
+        upper_threshold=500
     )
     """
 
@@ -706,7 +710,7 @@ class OccurenceCheck(ColumnTransformationCheck):
         if max_or_min not in ("max", "min"):
             raise ValueError("'max_or_min' not one of supported modes 'min' or 'max'")
         self.max_or_min = max_or_min
-        super().__init__(transformation_name=f"occurence_{max_or_min}", **kwargs)
+        super().__init__(transformation_name=f"occurrence_{max_or_min}", **kwargs)
 
     def transformation_statement(self) -> str:
         return f"{self.check_column}, COUNT(*) AS {self.name}"
@@ -770,8 +774,8 @@ class MatchRateCheck(DataQualityCheck):
         join_columns: Optional[list[str]] = None,
         join_columns_left: Optional[list[str]] = None,
         join_columns_right: Optional[list[str]] = None,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -915,29 +919,28 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         shop_id="SHOP01",  # optional
         check_column="sku_id",
         rolling_days=7,
-        distinct=True,
         shop_id_filter_column="shop_code",  # optional
         date_filter_column="DATE",  # mandatory
         lower_threshold=-0.15,
-        upper_threshold=0.15,
+        upper_threshold=0.15
     )
     """
 
     def __init__(
         self,
-        date: str,
         table: str,
         check_column: str,
         rolling_days: int,
-        date_filter_column: str = "BQ_PARTITIONTIME",
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        date_filter_column: str,
+        date_filter_value: str,
+        lower_threshold: THRESHOLD = "-infinity",
+        upper_threshold: THRESHOLD = "infinity",
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
         self.rolling_days = rolling_days
-        self.date = date
+        self.date_filter_value = date_filter_value
         self.date_filter_column = date_filter_column
 
         super().__init__(
@@ -946,8 +949,8 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
             monitor_only=monitor_only,
-            date=date,
             date_filter_column=date_filter_column,
+            date_filter_value=date_filter_value,
             extra_info=extra_info,
             **kwargs,
         )
@@ -970,8 +973,8 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         FROM
             `{self.table}`
         WHERE
-            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date}", INTERVAL {self.rolling_days} DAY)
-            AND "{self.date}"
+            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date_filter_value}", INTERVAL {self.rolling_days} DAY)
+            AND "{self.date_filter_value}"
         {where_statement}
         GROUP BY
             {self.date_filter_column}
@@ -983,9 +986,9 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         FROM
             base
         WHERE
-            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date}", INTERVAL {self.rolling_days} DAY)
+            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date_filter_value}", INTERVAL {self.rolling_days} DAY)
         AND
-            TIMESTAMP_SUB("{self.date}", INTERVAL 1 DAY)
+            TIMESTAMP_SUB("{self.date_filter_value}", INTERVAL 1 DAY)
         ),
 
         -- Helper is needed to cover case where no current data is available
@@ -994,7 +997,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             MAX(dist_cnt) AS dist_cnt
           FROM
             (
-                SELECT dist_cnt FROM base WHERE {self.date_filter_column} = "{self.date}"
+                SELECT dist_cnt FROM base WHERE {self.date_filter_column} = "{self.date_filter_value}"
                 UNION ALL
                 SELECT 0 AS dist_cnt
             )
@@ -1019,8 +1022,8 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
 
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            return f"{data_exists_query}\n{where_statement} AND {self.date_filter_column} = '{self.date}'"
-        return f"{data_exists_query}\nWHERE {self.date_filter_column} = '{self.date}'"
+            return f"{data_exists_query}\n{where_statement} AND {self.date_filter_column} = '{self.date_filter_value}'"
+        return f"{data_exists_query}\nWHERE {self.date_filter_column} = '{self.date_filter_value}'"
 
 
 class IqrOutlierCheck(ColumnTransformationCheck):
@@ -1044,7 +1047,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         date_filter_column="DATE",  # optional
         interval_days=14,
         how="both",  # check both upper and lower outliers
-        iqr_factor=1.5,
+        iqr_factor=1.5
     )
     """
 
@@ -1078,8 +1081,8 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             transformation_name=f"outlier_iqr_{self.how}_{str(self.iqr_factor).replace('.', '_')}",
             table=table,
             check_column=check_column,
-            lower_threshold=-np.inf,
-            upper_threshold=np.inf,
+            lower_threshold="-infinity",
+            upper_threshold="infinity",
             monitor_only=monitor_only,
             extra_info=extra_info,
             date=date,
@@ -1182,15 +1185,15 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                 stats
         """
 
-    def _check(self, bq_client: google.cloud.bigquery.Client, query: str) -> Tuple[QueryJob, List[dict], Optional[str]]:
-        query_job, query_result, error = super()._check(bq_client, query)
+    def _check(self, duckdb_client: duckdb.DuckDBPyConnection, query: str) -> tuple[list[dict], str | None]:
+        result, error = super()._check(duckdb_client, query)
         # overwrite the lower and upper thresholds as required
-        if query_result:
+        if result:
             if self.how in ["both", "lower"]:
-                self.lower_threshold = query_result[0]["lower_threshold"]
+                self.lower_threshold = result[0]["lower_threshold"]
             if self.how in ["both", "upper"]:
-                self.upper_threshold = query_result[0]["upper_threshold"]
-        return query_job, query_result, error
+                self.upper_threshold = result[0]["upper_threshold"]
+        return result, error
 
     def assemble_data_exists_query(self) -> str:
         data_exists_query = f"""

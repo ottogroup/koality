@@ -1,22 +1,17 @@
 import datetime as dt
 
-import numpy as np
-import pandas as pd
 import pytest
-from bquest.dataframe import assert_frame_equal
-from bquest.runner import SQLRunner
-from bquest.tables import BQTableDefinitionBuilder
-from google.cloud import bigquery as bq
+
+pytestmark = pytest.mark.integration
 
 
-@pytest.mark.bquest
 class TestColumnChecks:
-    @classmethod
-    def setup_class(cls):
-        bq_client = bq.Client(project="test-project-dev")
-        cls.bq_client = bq_client
-        cls.table_builder = BQTableDefinitionBuilder("test-project-dev")
-        cls.runner = SQLRunner(bq_client)
+    # @classmethod
+    # def setup_class(cls):
+    #     bq_client = bq.Client(project="test-project-dev")
+    #     cls.bq_client = bq_client
+    #     cls.table_builder = BQTableDefinitionBuilder("test-project-dev")
+    #     cls.runner = SQLRunner(bq_client)
 
     @pytest.fixture(scope="class")
     def dummy_table(self):
@@ -591,9 +586,9 @@ class TestColumnChecks:
 
     @pytest.fixture()
     def occurence_check(self):
-        from koality.checks import OccurenceCheck
+        from koality.checks import OccurrenceCheck
 
-        return OccurenceCheck
+        return OccurrenceCheck
 
     @pytest.mark.parametrize(
         "max_or_min, lower_threshold, upper_threshold, product_number, result_value, result_code",

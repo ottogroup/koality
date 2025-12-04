@@ -1,38 +1,33 @@
-import numpy as np
-import pandas as pd
 import pytest
-from bquest.dataframe import assert_frame_equal
-from bquest.runner import SQLRunner
-from bquest.tables import BQTableDefinitionBuilder
-from google.cloud import bigquery as bq
+
+pytestmark = pytest.mark.integration
 
 
-@pytest.mark.bquest
 class TestRelCountChangedCheck:
-    @classmethod
-    def setup_class(cls):
-        cls.table_builder = BQTableDefinitionBuilder("test-project-dev")
-        cls.runner = SQLRunner(bq.Client(project="test-project-dev"))
+    # @classmethod
+    # def setup_class(cls):
+    #     cls.table_builder = BQTableDefinitionBuilder("test-project-dev")
+    #     cls.runner = SQLRunner(bq.Client(project="test-project-dev"))
 
-    @pytest.fixture(scope="class")
-    def dummy_table(self):
-        df = pd.DataFrame(
-            {
-                "DATE": [pd.Timestamp("2022-12-30", tz="UTC")] * 8  # other shop
-                + [pd.Timestamp("2022-12-31", tz="UTC")] * 4
-                + [pd.Timestamp("2023-01-01", tz="UTC")] * 4
-                + [pd.Timestamp("2023-01-02", tz="UTC")] * 8
-                + [pd.Timestamp("2023-01-03", tz="UTC")] * 6,
-                "shop_id": ["SHOP006"] * 8 + ["SHOP001"] * 22,
-                "product_number": [f"SHOP006-{idx + 1:04d}" for idx in range(8)]  # other shop
-                + [f"SHOP001-{idx + 1:04d}" for idx in range(4)]
-                + [f"SHOP001-{idx + 1:04d}" for idx in range(4)]
-                + [f"SHOP001-{idx + 1:04d}" for idx in range(8)]
-                + [f"SHOP001-{idx + 1:04d}" for idx in range(6)],
-            }
-        )
-
-        return self.table_builder.from_df(name="dataset.dummy_table", df=df)
+    # @pytest.fixture(scope="class")
+    # def dummy_table(self):
+    #     df = pd.DataFrame(
+    #         {
+    #             "DATE": [pd.Timestamp("2022-12-30", tz="UTC")] * 8  # other shop
+    #             + [pd.Timestamp("2022-12-31", tz="UTC")] * 4
+    #             + [pd.Timestamp("2023-01-01", tz="UTC")] * 4
+    #             + [pd.Timestamp("2023-01-02", tz="UTC")] * 8
+    #             + [pd.Timestamp("2023-01-03", tz="UTC")] * 6,
+    #             "shop_id": ["SHOP006"] * 8 + ["SHOP001"] * 22,
+    #             "product_number": [f"SHOP006-{idx + 1:04d}" for idx in range(8)]  # other shop
+    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(4)]
+    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(4)]
+    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(8)]
+    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(6)],
+    #         }
+    #     )
+    #
+    #     return self.table_builder.from_df(name="dataset.dummy_table", df=df)
 
     @pytest.fixture()
     def rel_count_change_check(self):
@@ -45,7 +40,7 @@ class TestRelCountChangedCheck:
         [
             ("2023-01-02", 1.0),  # (8 - 4) / 4
             ("2023-01-03", 0.0),  # (6 - 6) / 6
-            ("2022-12-31", np.nan),  # no history
+            ("2022-12-31", None),  # no history
             ("2023-01-04", -1.0),  # (0 - 7) / 7, no current data
         ],
     )

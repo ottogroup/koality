@@ -1,13 +1,8 @@
-import numpy as np
-import pandas as pd
 import pytest
-from bquest.dataframe import assert_frame_equal
-from bquest.runner import SQLRunner
-from bquest.tables import BQTableDefinitionBuilder
-from google.cloud import bigquery as bq
+
+pytestmark = pytest.mark.integration
 
 
-@pytest.mark.bquest
 class TestMatchRateCheck:
     @classmethod
     def setup_class(cls):

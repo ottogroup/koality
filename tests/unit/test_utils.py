@@ -39,10 +39,7 @@ class TestResolveDottedName:
         )
 
     def test_resolve_dotted_name(self, resolve_dotted_name):
-        assert (
-            resolve_dotted_name("tests.unit.test_utils.TestResolveDottedName")
-            is TestResolveDottedName
-        )
+        assert resolve_dotted_name("tests.unit.test_utils.TestResolveDottedName") is TestResolveDottedName
 
     def test_resolve_dotted_name_koality_check(self, resolve_dotted_name):
         from koality.checks import NullRatioCheck
@@ -118,7 +115,7 @@ class TestFormatDynamic:
             (0.000101, 4, "0.0001"),
             (10.0001, 4, "10.0001"),
             (10.000001, 4, "10"),
-            #TODO Look at again maybe use diff then None?
+            # TODO Look at again maybe use diff then None?
             (None, 4, "nan"),
             (None, 4, "inf"),
             (None, 4, "-inf"),
@@ -142,12 +139,12 @@ class TestFormatDynamic:
         assert format_dynamic(0.000101) == "0.0001"
         assert format_dynamic(10.0001) == "10.0001"
         assert format_dynamic(10.000001) == "10"
-        #TODO Look at again
+        # TODO Look at again
         assert format_dynamic(None) == "nan"
         assert format_dynamic(None) == "inf"
         assert format_dynamic(None) == "-inf"
         assert format_dynamic(None) == "nan"
-        #End of TODO
+        # End of TODO
         assert format_dynamic(None) == "nan"
 
     def test_format_dynamic_false_min_precision(self, format_dynamic):

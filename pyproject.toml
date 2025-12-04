@@ -62,6 +62,14 @@ select = [
 [tool.ruff.lint.per-file-ignores]
 "src/koality/checks.py" = ["S608"]
 
+[tool.pytest.ini_options]
+log_level = "DEBUG"
+markers = [
+    "unit: unit tests",
+    "integration: integration tests",
+]
+testpaths = ["tests"]
+
 [tool.poe.tasks]
 # Linting and formatting.
 format = [

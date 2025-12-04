@@ -5,24 +5,7 @@ from ast import literal_eval
 from collections.abc import Iterable
 from importlib import import_module
 from typing import Any, Union
-
-import numpy as np
-import pandas as pd
-from pandas._libs.missing import NAType
-
-
-def parse_gcs_path(path: str) -> tuple[str, str]:
-    """Parses a path of the form gs://mybucket/my/blob"""
-    if not path.startswith("gs://"):
-        raise ValueError("A GCS path needs to start with gs://")
-
-    bucket_name = path[len("gs://") :].split("/")[0]
-    blob_name = path[len("gs://") + len(bucket_name) + 1 :]
-
-    if not blob_name:
-        raise ValueError("Blob name is empty")
-
-    return bucket_name, blob_name
+import datetime as dt
 
 
 def resolve_dotted_name(dotted_name: str) -> object:
@@ -52,7 +35,7 @@ def resolve_dotted_name(dotted_name: str) -> object:
     return attr
 
 
-def parse_date(date: Union[str, int], offset_days: int = 0) -> str:
+def parse_date(date: str, offset_days: int = 0) -> str:
     """
     Parses a date string which can be a relative terms like "today", "yesterday",
     or "tomorrow", actual dates, or relative dates like "today-2".
@@ -64,17 +47,17 @@ def parse_date(date: Union[str, int], offset_days: int = 0) -> str:
     date = str(date).lower()
     if date == "yesterday":
         offset_days -= 1
-        return (pd.Timestamp("today") + pd.Timedelta(days=offset_days)).date().isoformat()
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
 
     if date == "tomorrow":
         offset_days += 1
-        return (pd.Timestamp("today") + pd.Timedelta(days=offset_days)).date().isoformat()
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
 
     if regex_match := re.search(r"today([+-][0-9]+)", date):
         offset_days += int(regex_match[1])
-        return (pd.Timestamp("today") + pd.Timedelta(days=offset_days)).date().isoformat()
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
 
-    return (pd.Timestamp(date) + pd.Timedelta(days=offset_days)).date().isoformat()
+    return (dt.datetime.fromisoformat(date) + dt.timedelta(days=offset_days)).date().isoformat()
 
 
 def parse_arg(arg: str) -> Union[str, int, bool]:
@@ -116,7 +99,7 @@ def to_set(value: Any) -> set:
     return set(value)
 
 
-def format_dynamic(value: Union[int, float, None, NAType], min_precision: int = 4) -> str:
+def format_dynamic(value: int | float | None, min_precision: int = 4) -> str:
     """
     Rounds a numeric value to min_precision decimals or more if needed in order to get
     a non-zero result and returns it a string, e.g.:
@@ -133,8 +116,8 @@ def format_dynamic(value: Union[int, float, None, NAType], min_precision: int = 
     Returns:
         A rounded string representation of the value.
     """
-    if pd.isna(value) or value is None:
-        value = np.nan
+    if value is None:
+        return "None"
 
     if value == 0:
         return "0"
@@ -142,9 +125,9 @@ def format_dynamic(value: Union[int, float, None, NAType], min_precision: int = 
     if min_precision < 1:
         raise ValueError("min_precision must be >= 1")
 
-    prec = int(min_precision)
+    min_precision = int(min_precision)
 
-    while (rounded_value := round(value, prec)) == 0:
-        prec += 1
+    while (rounded_value := round(value, min_precision)) == 0:
+        min_precision += 1
 
-    return np.format_float_positional(rounded_value, trim="-")
+    return f"{rounded_value:.{min_precision}f}".rstrip("0").rstrip(".")
