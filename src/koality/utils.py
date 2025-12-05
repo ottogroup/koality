@@ -3,36 +3,8 @@
 import re
 from ast import literal_eval
 from collections.abc import Iterable
-from importlib import import_module
 from typing import Any, Union
 import datetime as dt
-
-
-def resolve_dotted_name(dotted_name: str) -> object:
-    """
-    Resolves a dotted name, e.g., pointing to a class or function and
-    returns the corresponding object.
-
-    Args:
-        dotted_name: A dotted path referring to a specific resource in a module.
-
-    Returns
-        An object (e.g., class) of a module.
-
-    """
-    if ":" in dotted_name:
-        module, name = dotted_name.split(":")
-    elif "." in dotted_name:
-        module, name = dotted_name.rsplit(".", 1)
-    else:
-        module, name = "koality.checks", dotted_name
-
-    attr = import_module(module)
-    if name:
-        for n in name.split("."):
-            attr = getattr(attr, n)
-
-    return attr
 
 
 def parse_date(date: str, offset_days: int = 0) -> str:

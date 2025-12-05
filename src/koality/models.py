@@ -1,96 +1,21 @@
-from dataclasses import dataclass
 from typing import Literal, Self
-from pydantic import BaseModel, computed_field, field_validator, model_validator, Field, conint, confloat
+from pydantic import BaseModel, computed_field, model_validator, Field, conint, confloat
 from pydantic_yaml import parse_yaml_raw_as
 
-@dataclass
-class NumberOrInfinity:
-    value: float | Literal["-infinity", "infinity"]
-
-    def __post_init__(self):
-        if isinstance(self.value, str):
-            if self.value.lower() in ["infinity", "inf", "+infinity", "+inf"]:
-                self.value = "infinity"
-            elif self.value.lower() in ["-infinity", "-inf"]:
-                self.value = "-infinity"
-            else:
-                raise ValueError(f"Invalid string for NumberOrInfinity: {self.value}")
-        elif not isinstance(self.value, (int, float)):
-            raise TypeError(f"Value must be a float or 'infinity'/'-infinity', got {type(self.value)}")
-
-    def __eq__(self, other: object) -> bool:
-        if isinstance(other, NumberOrInfinity):
-            return self.value == other.value
-        return self.value == other
-
-    def __ge__(self, other: "NumberOrInfinity | float | None") -> bool:
-        if isinstance(other, NumberOrInfinity):
-            other_value = other.value
-        else:
-            other_value = other
-        if self.value == "infinity":
-            return True
-        if self.value == "-infinity":
-            return other_value == "-infinity"
-        if other_value == "infinity":
-            return False
-        if other_value == "-infinity":
-            return True
-        if other_value is None:
-            return False
-        return self.value >= other_value
-
-    def __gt__(self, other: "NumberOrInfinity | float | None") -> bool:
-        if isinstance(other, NumberOrInfinity):
-            other_value = other.value
-        else:
-            other_value = other
-
-        if self.value == "infinity":
-            return other_value != "infinity"
-        if self.value == "-infinity":
-            return False
-        if other_value == "infinity":
-            return False
-        if other_value == "-infinity":
-            return True
-        if other_value is None:
-            return False
-        return self.value > other_value
-
-    def __le__(self, other: "NumberOrInfinity | float | None") -> bool:
-        if isinstance(other, NumberOrInfinity):
-            other_value = other.value
-        else:
-            other_value = other
-        if self.value == "infinity":
-            return other_value == "infinity"
-        if self.value == "-infinity":
-            return True
-        if other_value == "infinity":
-            return True
-        if other_value == "-infinity":
-            return False
-        if other_value is None:
-            return False
-        return self.value <= other_value
-
-    def __lt__(self, other: "NumberOrInfinity | float"):
-        if isinstance(other, NumberOrInfinity):
-            other_value = other.value
-        else:
-            other_value = other
-        if self.value == "infinity":
-            return False
-        if self.value == "-infinity":
-            return True
-        if other_value == "infinity":
-            return True
-        if other_value == "-infinity":
-            return False
-        if other_value is None:
-            return False
-        return self.value < other_value
+type CHECK_TYPE = Literal[
+    "DataQualityCheck",
+    "ColumnTransformationCheck",
+    "NullRatioCheck",
+    "RegexMatchCheck",
+    "ValuesInSetCheck",
+    "RollingValuesInSetCheck",
+    "DuplicateCheck",
+    "CountCheck",
+    "OccurrenceCheck",
+    "MatchRateCheck",
+    "RelCountChangeCheck",
+    "IqrOutlierCheck",
+]
 
 class _Defaults(BaseModel):
     date_filter_column: str | None = None
@@ -99,23 +24,7 @@ class _Defaults(BaseModel):
     filter_value: str | None = None
 
 class _LocalDefaults(_Defaults):
-    check_type: (
-            Literal[
-                "DataQualityCheck",
-                "ColumnTransformationCheck",
-                "NullRatioCheck",
-                "RegexMatchCheck",
-                "ValuesInSetCheck",
-                "RollingValuesInSetCheck",
-                "DuplicateCheck",
-                "CountCheck",
-                "OccurrenceCheck",
-                "MatchRateCheck",
-                "RelCountChangeCheck",
-                "IqrOutlierCheck",
-            ]
-            | None
-    ) = None
+    check_type: CHECK_TYPE | None = None
     check_column: str | None = None
     lower_threshold: float | Literal["-infinity", "infinity"] = "-infinity"
     upper_threshold: float | Literal["-infinity", "infinity"] = "infinity"

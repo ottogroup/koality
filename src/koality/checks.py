@@ -2,15 +2,13 @@
 
 import abc
 import datetime as dt
+import math
 import re
-from typing import Any, Iterable, List, Literal, Optional, Tuple
+from typing import Any, Iterable, Literal, Optional
 
 import duckdb
 
-from koality.models import NumberOrInfinity
 from koality.utils import format_dynamic, parse_date, to_set
-
-type THRESHOLD = NumberOrInfinity | float | Literal["infinity", "-infinity"]
 
 
 class DataQualityCheck(abc.ABC):
@@ -31,19 +29,15 @@ class DataQualityCheck(abc.ABC):
         self,
         table: str,
         check_column: Optional[str] = None,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
         self.table = table
-        if isinstance(lower_threshold, NumberOrInfinity):
-            lower_threshold = lower_threshold.value
-        self.lower_threshold = NumberOrInfinity(lower_threshold)
-        if isinstance(upper_threshold, NumberOrInfinity):
-            upper_threshold = upper_threshold.value
-        self.upper_threshold = NumberOrInfinity(upper_threshold)
+        self.lower_threshold = lower_threshold
+        self.upper_threshold = upper_threshold
         self.monitor_only = monitor_only
         self.extra_info_string = f" {extra_info}" if extra_info else ""
         self.date_info_string = f" ({kwargs['date_info']})" if "date_info" in kwargs else ""
@@ -107,6 +101,7 @@ class DataQualityCheck(abc.ABC):
         is_empty_table = False
         empty_table = ""
         try:
+            print(self.assemble_data_exists_query())
             query_job = duckdb_client.query(self.assemble_data_exists_query())
         except Exception as e:
             empty_table = f"Error while executing data check query on {self.table}"
@@ -164,7 +159,7 @@ class DataQualityCheck(abc.ABC):
             if self.monitor_only:
                 result = "MONITOR_ONLY"
             else:
-                success = self.lower_threshold <= check_value <= self.upper_threshold
+                success = check_value is not None and self.lower_threshold <= check_value <= self.upper_threshold
                 result = "SUCCESS" if success else "FAIL"
 
         date = self.date_filter_value if hasattr(self, "date") else dt.datetime.today().isoformat()
@@ -279,8 +274,8 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         transformation_name: str,
         table: str,
         check_column: Optional[str] = None,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -359,8 +354,8 @@ class NullRatioCheck(ColumnTransformationCheck):
         self,
         table: str,
         check_column: str,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -409,8 +404,8 @@ class RegexMatchCheck(ColumnTransformationCheck):
         table: str,
         check_column: str,
         regex_to_match: str,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -465,8 +460,8 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         table: str,
         check_column: str,
         value_set: str | bytes | Iterable,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         transformation_name: Optional[str] = None,
         extra_info: Optional[str] = None,
@@ -522,8 +517,8 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         check_column: str,
         value_set: str | bytes | Iterable,
         date_filter_column: str = "BQ_PARTITIONTIME",
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -587,8 +582,8 @@ class DuplicateCheck(ColumnTransformationCheck):
         self,
         table: str,
         check_column: str,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -640,8 +635,8 @@ class CountCheck(ColumnTransformationCheck):
         table: str,
         check_column: str,
         distinct: bool = False,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -774,8 +769,8 @@ class MatchRateCheck(DataQualityCheck):
         join_columns: Optional[list[str]] = None,
         join_columns_left: Optional[list[str]] = None,
         join_columns_right: Optional[list[str]] = None,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -837,7 +832,7 @@ class MatchRateCheck(DataQualityCheck):
             {right_column_statement},
             TRUE AS in_right_table
         FROM
-            `{self.right_table}`
+            `{self.config.database_accessor}.{self.right_table}`
         {self.assemble_where_statement(self.filters_right)}
         ),
 
@@ -933,8 +928,8 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         rolling_days: int,
         date_filter_column: str,
         date_filter_value: str,
-        lower_threshold: THRESHOLD = "-infinity",
-        upper_threshold: THRESHOLD = "infinity",
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -1055,8 +1050,8 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         self,
         check_column: str,
         table: str,
-        date: str,
         date_filter_column: str,
+        date_filter_value: str,
         interval_days: int,
         how: Literal["both", "upper", "lower"],
         iqr_factor: float,
@@ -1064,8 +1059,8 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         extra_info: Optional[str] = None,
         **kwargs,
     ):
-        self.date = date
         self.date_filter_column = date_filter_column
+        self.date_filter_value = date_filter_value
         if interval_days < 1:
             raise ValueError("interval_days must be at least 1")
         self.interval_days = int(interval_days)
@@ -1081,12 +1076,12 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             transformation_name=f"outlier_iqr_{self.how}_{str(self.iqr_factor).replace('.', '_')}",
             table=table,
             check_column=check_column,
-            lower_threshold="-infinity",
-            upper_threshold="infinity",
+            lower_threshold=-math.inf,
+            upper_threshold=math.inf,
             monitor_only=monitor_only,
             extra_info=extra_info,
-            date=date,
             date_filter_column=date_filter_column,
+            date_filter_value=date_filter_value,
             **kwargs,
         )
 
@@ -1129,9 +1124,9 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
         return f"""
           DECLARE slice_count INT64;
-          SET slice_count = (SELECT COUNT(*) FROM {self.table} WHERE {self.date_filter_column} = "{self.date}");
+          SET slice_count = (SELECT COUNT(*) FROM {self.table} WHERE {self.date_filter_column} = "{self.date_filter_value}");
           IF slice_count = 0 THEN
-            RAISE USING MESSAGE = 'No data for {self.date} in {self.table}!';
+            RAISE USING MESSAGE = 'No data for {self.date_filter_value} in {self.table}!';
           END IF;
 
           {self._percentile_udf}
@@ -1145,15 +1140,15 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             FROM
                 {self.table}
             WHERE
-                DATE({self.date_filter_column}) BETWEEN DATE_SUB("{self.date}", INTERVAL {self.interval_days} DAY)
-                AND "{self.date}"
+                DATE({self.date_filter_column}) BETWEEN DATE_SUB("{self.date_filter_value}", INTERVAL {self.interval_days} DAY)
+                AND "{self.date_filter_value}"
                 {where_statement}
           ),
           compare AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} < "{self.date}"
+            SELECT * FROM raw WHERE {self.date_filter_column} < "{self.date_filter_value}"
           ),
           slice AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} = "{self.date}"
+            SELECT * FROM raw WHERE {self.date_filter_column} = "{self.date_filter_value}"
           ),
           percentiles AS (
             SELECT
@@ -1204,7 +1199,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         """
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            where_statement = f"{where_statement} AND {self.date_filter_column} = '{self.date}'"
+            where_statement = f"{where_statement} AND {self.date_filter_column} = '{self.date_filter_value}'"
         else:
-            where_statement = f"WHERE {self.date_filter_column} = '{self.date}'"
+            where_statement = f"WHERE {self.date_filter_column} = '{self.date_filter_value}'"
         return f"{data_exists_query}\n{where_statement}"
