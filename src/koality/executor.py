@@ -1,12 +1,14 @@
 """Module containing the actual check execution logic."""
-
+import datetime
 import logging
+from collections import defaultdict
 from typing import List
 import duckdb
 
 from koality.checks import DataQualityCheck, NullRatioCheck, RegexMatchCheck, ValuesInSetCheck, RollingValuesInSetCheck, DuplicateCheck, \
     CountCheck, OccurrenceCheck, MatchRateCheck, RelCountChangeCheck, IqrOutlierCheck
 from koality.models import Config, CHECK_TYPE
+from koality.utils import execute_query, identify_database_provider
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -24,6 +26,27 @@ CHECK_MAP: dict[CHECK_TYPE, type[DataQualityCheck]] = {
     "IqrOutlierCheck": IqrOutlierCheck
 }
 
+# Mapping from DuckDB types to database-specific types
+# Structure: {duckdb_type: {database_type: target_type}}
+# Uses defaultdict so unknown database types fall back to the original duckdb_type
+DATA_TYPES: dict[str, dict[str, str]] = defaultdict(dict, {
+    "VARCHAR": defaultdict(lambda: "VARCHAR", {
+        "bigquery": "STRING",
+    }),
+    "DATE": defaultdict(lambda: "DATE",
+        {
+        "bigquery": "DATE",
+    }),
+    "TIMESTAMP": defaultdict(lambda: "TIMESTAMP",
+                             {
+        "bigquery": "TIMESTAMP",
+    }),
+    "NUMERIC": defaultdict(lambda: "NUMERIC",
+    {
+        "bigquery": "FLOAT64",
+    }),
+})
+
 
 class CheckExecutor:
     """
@@ -40,20 +63,15 @@ class CheckExecutor:
     def __init__(
         self,
         config: Config,
+        duckdb_client: duckdb.DuckDBPyConnection | None = None,
         **kwargs,
     ) -> None:
         self.config = config
-        self.duckdb_client = duckdb.connect(":memory:")
-        self.duckdb_client.query(self.config.database_setup)
-        result = self.duckdb_client.execute(
-            """
-            SELECT COUNT(*) > 0 AS exists
-            FROM duckdb_databases()
-            WHERE database_name = 'bq'
-            """
-        ).fetchone()
-        if result is None or result[0] is None:
-            raise ValueError("DuckDB BigQuery extension is not loaded properly.")
+        if duckdb_client is not None:
+            self.duckdb_client = duckdb_client
+        else:
+            self.duckdb_client = duckdb.connect(":memory:")
+            self.duckdb_client.query(self.config.database_setup)
 
         self.kwargs = kwargs
 
@@ -79,20 +97,20 @@ class CheckExecutor:
         in a results dict for further processing.
         """
 
-        check_suite_dict = self.config
         results = []
+        database_provider = None
+        if self.config.database_accessor:
+            database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
         for check_bundle in self.config.check_bundles:
             for check in check_bundle.checks:
                 # check_with_default_args = check_bundle.get("default_args", {}) | check
                 # log.info(", ".join(["{}: {}".format(k, v) for k, v in check_with_default_args.items()]))
                 # check_dict = check_suite_dict.get("global_defaults", {}) | check_with_default_args
                 check_factory = CHECK_MAP[check.check_type]
-                check_kwargs = check.model_dump(exclude={"check_type"})
-                # qualify tables with database accessor if provided
-                if self.config.database_accessor:
-                    for table_reference in ["table", "left_table", "right_table"]:
-                        if table_reference in check_kwargs:
-                            check_kwargs[table_reference] = f"{self.config.database_accessor}.{check_kwargs[table_reference]}"
+                check_kwargs = check.model_dump(exclude={"check_type"}, exclude_unset=True)
+                check_kwargs["database_accessor"] = self.config.database_accessor
+                check_kwargs["database_provider"] = database_provider
+                print(check_kwargs)
                 check = check_factory(**check_kwargs)
                 self.checks.append(check)
 
@@ -230,34 +248,68 @@ class CheckExecutor:
             log.info("No entries in results from checks, so no results were persisted.")
             return
 
+        now = datetime.datetime.now()
+
         # Copy rows first, cause INSERT_TIMESTAMP and AUTO value is only a BQ feature and not needed anywhere else
         results_with_it: list[dict] = self._aggregate_result_dicts(self.result_dicts).copy()
         # Add INSERT_TIMESTAMP col with AUTO value to automatically set insert_timestamp (BQ feature)
         for row in results_with_it:
-            row["INSERT_TIMESTAMP"] = "AUTO"
+            row["INSERT_TIMESTAMP"] = now
 
-        # Convert results_with_it to VALUES clause
-        values_clause = ", ".join([
-            f"('{row['DATE']}', '{row['METRIC_NAME']}', '{row['TABLE']}', '{row['SHOP_ID']}', "
-            f"'{row['COLUMN']}', '{row['VALUE']}', '{row['LOWER_THRESHOLD']}', "
-            f"'{row['UPPER_THRESHOLD']}', '{row['RESULT']}', '{row['INSERT_TIMESTAMP']}')"
-            for row in results_with_it
-        ])
         if self.config.database_accessor:
+            database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
+            query_create_or_replace_table = f"""
+                CREATE TABLE IF NOT EXISTS {self.result_table} (
+                    DATE {DATA_TYPES["DATE"][database_provider.type]}, 
+                    METRIC_NAME {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    TABLE {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    SHOP_ID {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    COLUMN {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    VALUE {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]}, 
+                    UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]}, 
+                    RESULT {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    INSERT_TIMESTAMP {DATA_TYPES["TIMESTAMP"][database_provider.type]} DEFAULT CURRENT_TIMESTAMP
+                )
+            """
             try:
                 # make sure table exists
-                self.duckdb_client.execute(
-                    f"""
-                    CREATE TABLE IF NOT EXISTS {self.config.database_accessor}.{self.result_table} (DATE DATE, METRIC_NAME VARCHAR, "TABLE" VARCHAR, SHOP_ID VARCHAR,
-                    "COLUMN" VARCHAR, VALUE VARCHAR, LOWER_THRESHOLD VARCHAR, UPPER_THRESHOLD VARCHAR, RESULT VARCHAR, INSERT_TIMESTAMP TIMESTAMP DEFAULT CURRENT_TIMESTAMP)
-                    """
-                )
-                self.duckdb_client.execute(
-                    f"INSERT INTO {self.config.database_accessor}.{self.result_table} "
-                    f"SELECT * FROM VALUES({values_clause})"
+                execute_query(
+                    query_create_or_replace_table,
+                    self.duckdb_client,
+                    database_provider,
                 )
             except Exception as e:
                 raise ValueError(f"response {e} could not be inserted into table")
+
+            # Convert results_with_it to VALUES clause
+            values_clause = ", ".join([
+                f"""
+                    (
+                        "{row["DATE"]}", 
+                        "{row["METRIC_NAME"]}", 
+                        "{row["TABLE"]}", 
+                        "{row["SHOP_ID"]}", 
+                        "{row["COLUMN"]}", 
+                        {row["VALUE"] if row["VALUE"] is not None else 'NULL'}, 
+                        {row["LOWER_THRESHOLD"]},
+                        {row["UPPER_THRESHOLD"]}, 
+                        "{row["RESULT"]}", 
+                        "{row["INSERT_TIMESTAMP"]}"
+                    ) 
+                """
+                for row in results_with_it
+            ])
+            query_insert_values_into_result_table = f"""
+                INSERT INTO {self.result_table}
+                (DATE, METRIC_NAME, `TABLE`, SHOP_ID, `COLUMN`, VALUE, LOWER_THRESHOLD, UPPER_THRESHOLD, RESULT, INSERT_TIMESTAMP)
+                VALUES {values_clause}
+            """
+            execute_query(
+                query_insert_values_into_result_table,
+                self.duckdb_client,
+                database_provider,
+            )
 
             log.info(f"{len(results_with_it)} entries were persisted to {self.config.database_accessor}.{self.result_table}")
 
@@ -275,8 +327,12 @@ class CheckExecutor:
             self.load_to_database()
 
         if self.log_path:
-            with open(self.log_path, "w", encoding="utf-8") as file:
-                file.write(self.get_failed_checks_msg())
+            failed_checks_msg = self.get_failed_checks_msg()
+            if not failed_checks_msg:
+                log.info("No failed checks, so no log file was written.")
+            else:
+                with open(self.log_path, "w", encoding="utf-8") as file:
+                    file.write(self.get_failed_checks_msg())
             log.info(f"DQM outputs were written to {self.log_path}")
 
         return self.result_dicts

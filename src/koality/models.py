@@ -1,6 +1,21 @@
+from dataclasses import dataclass
 from typing import Literal, Self
 from pydantic import BaseModel, computed_field, model_validator, Field, conint, confloat
 from pydantic_yaml import parse_yaml_raw_as
+from dataclasses import dataclass
+
+@dataclass
+class DatabaseProvider:
+    database_name: str
+    database_oid: int
+    path: str
+    comment: str | None
+    tags: dict
+    internal: bool
+    type: str
+    readonly: bool
+    encrypted: bool
+    cipher: str | None
 
 type CHECK_TYPE = Literal[
     "DataQualityCheck",
@@ -16,6 +31,8 @@ type CHECK_TYPE = Literal[
     "RelCountChangeCheck",
     "IqrOutlierCheck",
 ]
+
+type CHECK = _NullRatioCheck| _RegexMatchCheck| _ValuesInSetCheck| _RollingValuesInSetCheck| _DuplicateCheck| _CountCheck| _OccurrenceCheck| _MatchRateCheck| _RelCountChangeCheck| _IqrOutlierCheck
 
 class _Defaults(BaseModel):
     date_filter_column: str | None = None
@@ -131,18 +148,7 @@ class _IqrOutlierCheck(_SingleTableCheck):
 class _CheckBundle(BaseModel):
     name: str
     default_args: _LocalDefaults = Field(default_factory=_LocalDefaults)
-    checks: list[
-        _NullRatioCheck
-        | _RegexMatchCheck
-        | _ValuesInSetCheck
-        | _RollingValuesInSetCheck
-        | _DuplicateCheck
-        | _CountCheck
-        | _OccurrenceCheck
-        | _MatchRateCheck
-        | _RelCountChangeCheck
-        | _IqrOutlierCheck
-    ]
+    checks: list[CHECK]
 
 
 class Config(BaseModel):

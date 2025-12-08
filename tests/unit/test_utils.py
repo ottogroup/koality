@@ -1,5 +1,4 @@
 import datetime as dt
-import tests
 
 import pytest
 
@@ -25,28 +24,6 @@ def test_parse_arg(test_input, expected):
     assert expected == parse_arg(test_input)
 
 
-class TestResolveDottedName:
-    @pytest.fixture()
-    def resolve_dotted_name(self):
-        from koality.utils import resolve_dotted_name
-
-        return resolve_dotted_name
-
-    def test_resolve_dotted_name_colon(self, resolve_dotted_name):
-        assert (
-            resolve_dotted_name("tests.unit.test_utils:TestResolveDottedName.test_resolve_dotted_name_colon")
-            is TestResolveDottedName.test_resolve_dotted_name_colon
-        )
-
-    def test_resolve_dotted_name(self, resolve_dotted_name):
-        assert resolve_dotted_name("tests.unit.test_utils.TestResolveDottedName") is TestResolveDottedName
-
-    def test_resolve_dotted_name_koality_check(self, resolve_dotted_name):
-        from koality.checks import NullRatioCheck
-
-        assert resolve_dotted_name("NullRatioCheck") is NullRatioCheck
-
-
 @pytest.mark.parametrize(
     "input_date, offset, expected",
     [
@@ -69,86 +46,20 @@ def test_parse_date(input_date, offset, expected):
 
     assert expected == parse_date(input_date, offset)
 
-
-class TestEnsureSetString:
-    @pytest.fixture
-    def to_set(self):
-        from koality.utils import to_set
-
-        return to_set
-
-    @pytest.mark.parametrize(
-        "test_input, expected",
-        [
-            ('("toys", "clothing")', {"clothing", "toys"}),
-            ('("toys")', {"toys"}),
-            ('"toys"', {"toys"}),
-            ("toys", {"toys"}),
-            ('("toys", "toys", "clothing")', {"clothing", "toys"}),
-            ('("clothing", "toys")', {"clothing", "toys"}),
-            (True, {True}),
-            (1, {1}),
-            (["toys"], {"toys"}),
-            ({"toys"}, {"toys"}),
-        ],
-    )
-    def test_to_set(self, to_set, test_input, expected):
-        assert to_set(test_input) == expected
-
-
-class TestFormatDynamic:
-    @pytest.fixture
-    def format_dynamic(self):
-        from koality.utils import format_dynamic
-
-        return format_dynamic
-
-    @pytest.mark.parametrize(
-        "value, min_precision, output",
-        [
-            (0, 4, "0"),
-            (0.0, 4, "0"),
-            (0.1, 4, "0.1"),
-            (0.0001, 4, "0.0001"),
-            (0.00009, 4, "0.0001"),
-            (0.000001, 4, "0.000001"),
-            (0.000101, 4, "0.0001"),
-            (10.0001, 4, "10.0001"),
-            (10.000001, 4, "10"),
-            # TODO Look at again maybe use diff then None?
-            (None, 4, "nan"),
-            (None, 4, "inf"),
-            (None, 4, "-inf"),
-            (None, 4, "nan"),
-            (None, 4, "nan"),
-            # non default precicions
-            (0.103456789, 1, "0.1"),
-            (0.103456789, 2, "0.1"),
-            (0.103456789, 3, "0.103"),
-            (0.103456789, 4, "0.1035"),
-            (-0.103456789, 4, "-0.1035"),
-            (0.10345678900, 9, "0.103456789"),
-            (0.10345678900, 10, "0.103456789"),
-        ],
-    )
-    def test_format_dynamic(self, format_dynamic, value, output, min_precision):
-        assert format_dynamic(value, min_precision) == output
-
-    def test_format_dynamic_default(self, format_dynamic):
-        assert format_dynamic(0.000001) == "0.000001"
-        assert format_dynamic(0.000101) == "0.0001"
-        assert format_dynamic(10.0001) == "10.0001"
-        assert format_dynamic(10.000001) == "10"
-        # TODO Look at again
-        assert format_dynamic(None) == "nan"
-        assert format_dynamic(None) == "inf"
-        assert format_dynamic(None) == "-inf"
-        assert format_dynamic(None) == "nan"
-        # End of TODO
-        assert format_dynamic(None) == "nan"
-
-    def test_format_dynamic_false_min_precision(self, format_dynamic):
-        with pytest.raises(ValueError) as exc:
-            format_dynamic(0.1234, -5)
-
-        assert str(exc.value) == "min_precision must be >= 1"
+@pytest.mark.parametrize(
+    "test_input, expected",
+    [
+        ('("toys", "clothing")', {"clothing", "toys"}),
+        ('("toys")', {"toys"}),
+        ('"toys"', {"toys"}),
+        ("toys", {"toys"}),
+        ('("toys", "toys", "clothing")', {"clothing", "toys"}),
+        ('("clothing", "toys")', {"clothing", "toys"}),
+        (True, {True}),
+        (1, {1}),
+        (["toys"], {"toys"}),
+        ({"toys"}, {"toys"}),
+    ],
+)
+def test_to_set(to_set, test_input, expected):
+    assert to_set(test_input) == expected
