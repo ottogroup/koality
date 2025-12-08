@@ -4,6 +4,7 @@ from pydantic import BaseModel, computed_field, model_validator, Field, conint, 
 from pydantic_yaml import parse_yaml_raw_as
 from dataclasses import dataclass
 
+
 @dataclass
 class DatabaseProvider:
     database_name: str
@@ -16,6 +17,7 @@ class DatabaseProvider:
     readonly: bool
     encrypted: bool
     cipher: str | None
+
 
 type CHECK_TYPE = Literal[
     "DataQualityCheck",
@@ -32,13 +34,26 @@ type CHECK_TYPE = Literal[
     "IqrOutlierCheck",
 ]
 
-type CHECK = _NullRatioCheck| _RegexMatchCheck| _ValuesInSetCheck| _RollingValuesInSetCheck| _DuplicateCheck| _CountCheck| _OccurrenceCheck| _MatchRateCheck| _RelCountChangeCheck| _IqrOutlierCheck
+type CHECK = (
+    _NullRatioCheck
+    | _RegexMatchCheck
+    | _ValuesInSetCheck
+    | _RollingValuesInSetCheck
+    | _DuplicateCheck
+    | _CountCheck
+    | _OccurrenceCheck
+    | _MatchRateCheck
+    | _RelCountChangeCheck
+    | _IqrOutlierCheck
+)
+
 
 class _Defaults(BaseModel):
     date_filter_column: str | None = None
     date_filter_value: str | None = None
     filter_column: str | None = None
     filter_value: str | None = None
+
 
 class _LocalDefaults(_Defaults):
     check_type: CHECK_TYPE | None = None
@@ -48,42 +63,53 @@ class _LocalDefaults(_Defaults):
     right_table: str | None = None
     left_table: str | None = None
 
+
 class _GlobalDefaults(_Defaults):
     monitor_only: bool = False
     result_table: str | None = None
+
     @computed_field
     def persist_results(self) -> bool:
         return self.result_table is not None
+
     log_path: str | None = None
+
 
 class _Check(_LocalDefaults):
     """Base model for all check configurations."""
+
     pass
+
 
 class _SingleTableCheck(_Check):
     """Base model for checks that operate on a single table."""
+
     table: str
 
 
 class _NullRatioCheck(_SingleTableCheck):
     """Config model for NullRatioCheck."""
+
     check_type: Literal["NullRatioCheck"]
 
 
 class _RegexMatchCheck(_SingleTableCheck):
     """Config model for RegexMatchCheck."""
+
     check_type: Literal["NullRatioCheck"]
     regex_to_match: str
 
 
 class _ValuesInSetCheck(_SingleTableCheck):
     """Config model for ValuesInSetCheck."""
+
     check_type: Literal["ValuesInSetCheck"]
     value_set: list[str] | str
 
 
 class _RollingValuesInSetCheck(_ValuesInSetCheck):
     """Config model for RollingValuesInSetCheck."""
+
     check_type: Literal["RollingValuesInSetCheck"]
     date_filter_column: str
     date_filter_value: str
@@ -91,23 +117,27 @@ class _RollingValuesInSetCheck(_ValuesInSetCheck):
 
 class _DuplicateCheck(_SingleTableCheck):
     """Config model for DuplicateCheck."""
+
     check_type: Literal["DuplicateCheck"]
 
 
 class _CountCheck(_SingleTableCheck):
     """Config model for CountCheck."""
+
     check_type: Literal["CountCheck"]
     distinct: bool = False
 
 
 class _OccurrenceCheck(_SingleTableCheck):
     """Config model for OccurrenceCheck."""
+
     check_type: Literal["OccurrenceCheck"]
     max_or_min: Literal["max", "min"]
 
 
 class _MatchRateCheck(_Check):
     """Config model for MatchRateCheck."""
+
     check_type: Literal["MatchRateCheck"]
     left_table: str
     right_table: str
@@ -132,12 +162,15 @@ class _MatchRateCheck(_Check):
 
 class _RelCountChangeCheck(_SingleTableCheck):
     """Config model for RelCountChangeCheck."""
+
     rolling_days: conint(ge=1)
     date_filter_column: str
     date_filter_value: str
 
+
 class _IqrOutlierCheck(_SingleTableCheck):
     """Config model for IqrOutlierCheck."""
+
     date_filter_column: str
     date_filter_value: str
     interval_days: conint(ge=1)
@@ -200,6 +233,7 @@ class Config(BaseModel):
 
         data["check_bundles"] = updated_bundles
         return data
+
 
 if __name__ == "__main__":
     from pathlib import Path

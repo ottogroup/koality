@@ -36,7 +36,6 @@ def duckdb_client():
     return conn
 
 
-
 @pytest.fixture()
 def config_file_success(tmp_path):
     content = dedent(
@@ -78,6 +77,7 @@ def config_file_success(tmp_path):
     tmp_file.write_text(content)
     return tmp_file
 
+
 @pytest.fixture()
 def config_file_failure(tmp_path):
     content = dedent(
@@ -104,6 +104,7 @@ def config_file_failure(tmp_path):
     tmp_file = tmp_path / "koality_config.yaml"
     tmp_file.write_text(content)
     return tmp_file
+
 
 @pytest.fixture
 def config_file_failure_v2(tmp_path):
@@ -138,6 +139,7 @@ def config_file_failure_v2(tmp_path):
     tmp_file.write_text(content)
     return tmp_file
 
+
 @pytest.fixture()
 def config_file_missing_data_v2(tmp_path):
     """Config that queries a non-existent table to trigger data_exists failure."""
@@ -168,6 +170,7 @@ def config_file_missing_data_v2(tmp_path):
     tmp_file = tmp_path / "koality_config.yaml"
     tmp_file.write_text(content)
     return tmp_file
+
 
 def test_executor_all_success(config_file_success, duckdb_client):
     config = parse_yaml_raw_as(Config, config_file_success.read_text())

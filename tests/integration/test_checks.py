@@ -4,6 +4,7 @@ import pytest
 
 pytestmark = pytest.mark.integration
 
+
 @pytest.fixture
 def duckdb_client():
     """Create an in-memory DuckDB connection with test data."""
@@ -44,6 +45,7 @@ def test_message_no_extra_info(duckdb_client):
         "SHOP001: Metric row_count failed on 2023-01-01 for dummy_table. Value 99.0000 is not between 1000 and 9999."
     )
 
+
 def test_message_date_info(duckdb_client):
     check = CountCheck(
         database_accessor="",
@@ -65,6 +67,7 @@ def test_message_date_info(duckdb_client):
         "(PREDICTION_DATE = real date + 1) for dummy_table. Value 99.0000 is not between 1000 and 9999."
     )
 
+
 def test_message_extra_info(duckdb_client):
     check = CountCheck(
         database_accessor="",
@@ -85,6 +88,7 @@ def test_message_extra_info(duckdb_client):
         "SHOP001: Metric row_count failed on 2023-01-01 for dummy_table. "
         "Value 99.0000 is not between 1000 and 9999. Note: This is an awesome check."
     )
+
 
 def test_message_correct_formatting():
     """

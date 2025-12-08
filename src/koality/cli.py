@@ -1,4 +1,5 @@
 """CLI for koality."""
+
 from pathlib import Path
 
 import click

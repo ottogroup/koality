@@ -1,12 +1,24 @@
 """Module containing the actual check execution logic."""
+
 import datetime
 import logging
 from collections import defaultdict
 from typing import List
 import duckdb
 
-from koality.checks import DataQualityCheck, NullRatioCheck, RegexMatchCheck, ValuesInSetCheck, RollingValuesInSetCheck, DuplicateCheck, \
-    CountCheck, OccurrenceCheck, MatchRateCheck, RelCountChangeCheck, IqrOutlierCheck
+from koality.checks import (
+    DataQualityCheck,
+    NullRatioCheck,
+    RegexMatchCheck,
+    ValuesInSetCheck,
+    RollingValuesInSetCheck,
+    DuplicateCheck,
+    CountCheck,
+    OccurrenceCheck,
+    MatchRateCheck,
+    RelCountChangeCheck,
+    IqrOutlierCheck,
+)
 from koality.models import Config, CHECK_TYPE
 from koality.utils import execute_query, identify_database_provider
 
@@ -23,29 +35,41 @@ CHECK_MAP: dict[CHECK_TYPE, type[DataQualityCheck]] = {
     "OccurrenceCheck": OccurrenceCheck,
     "MatchRateCheck": MatchRateCheck,
     "RelCountChangeCheck": RelCountChangeCheck,
-    "IqrOutlierCheck": IqrOutlierCheck
+    "IqrOutlierCheck": IqrOutlierCheck,
 }
 
 # Mapping from DuckDB types to database-specific types
 # Structure: {duckdb_type: {database_type: target_type}}
 # Uses defaultdict so unknown database types fall back to the original duckdb_type
-DATA_TYPES: dict[str, dict[str, str]] = defaultdict(dict, {
-    "VARCHAR": defaultdict(lambda: "VARCHAR", {
-        "bigquery": "STRING",
-    }),
-    "DATE": defaultdict(lambda: "DATE",
-        {
-        "bigquery": "DATE",
-    }),
-    "TIMESTAMP": defaultdict(lambda: "TIMESTAMP",
-                             {
-        "bigquery": "TIMESTAMP",
-    }),
-    "NUMERIC": defaultdict(lambda: "NUMERIC",
+DATA_TYPES: dict[str, dict[str, str]] = defaultdict(
+    dict,
     {
-        "bigquery": "FLOAT64",
-    }),
-})
+        "VARCHAR": defaultdict(
+            lambda: "VARCHAR",
+            {
+                "bigquery": "STRING",
+            },
+        ),
+        "DATE": defaultdict(
+            lambda: "DATE",
+            {
+                "bigquery": "DATE",
+            },
+        ),
+        "TIMESTAMP": defaultdict(
+            lambda: "TIMESTAMP",
+            {
+                "bigquery": "TIMESTAMP",
+            },
+        ),
+        "NUMERIC": defaultdict(
+            lambda: "NUMERIC",
+            {
+                "bigquery": "FLOAT64",
+            },
+        ),
+    },
+)
 
 
 class CheckExecutor:
@@ -283,23 +307,25 @@ class CheckExecutor:
                 raise ValueError(f"response {e} could not be inserted into table")
 
             # Convert results_with_it to VALUES clause
-            values_clause = ", ".join([
-                f"""
+            values_clause = ", ".join(
+                [
+                    f"""
                     (
                         "{row["DATE"]}", 
                         "{row["METRIC_NAME"]}", 
                         "{row["TABLE"]}", 
                         "{row["SHOP_ID"]}", 
                         "{row["COLUMN"]}", 
-                        {row["VALUE"] if row["VALUE"] is not None else 'NULL'}, 
+                        {row["VALUE"] if row["VALUE"] is not None else "NULL"}, 
                         {row["LOWER_THRESHOLD"]},
                         {row["UPPER_THRESHOLD"]}, 
                         "{row["RESULT"]}", 
                         "{row["INSERT_TIMESTAMP"]}"
                     ) 
                 """
-                for row in results_with_it
-            ])
+                    for row in results_with_it
+                ]
+            )
             query_insert_values_into_result_table = f"""
                 INSERT INTO {self.result_table}
                 (DATE, METRIC_NAME, `TABLE`, SHOP_ID, `COLUMN`, VALUE, LOWER_THRESHOLD, UPPER_THRESHOLD, RESULT, INSERT_TIMESTAMP)
@@ -311,7 +337,9 @@ class CheckExecutor:
                 database_provider,
             )
 
-            log.info(f"{len(results_with_it)} entries were persisted to {self.config.database_accessor}.{self.result_table}")
+            log.info(
+                f"{len(results_with_it)} entries were persisted to {self.config.database_accessor}.{self.result_table}"
+            )
 
     def __call__(self):
         self.execute_checks()

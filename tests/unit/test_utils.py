@@ -46,6 +46,7 @@ def test_parse_date(input_date, offset, expected):
 
     assert expected == parse_date(input_date, offset)
 
+
 @pytest.mark.parametrize(
     "test_input, expected",
     [

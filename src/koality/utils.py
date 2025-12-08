@@ -1,4 +1,5 @@
 """Utils for big expectations"""
+
 from collections import defaultdict
 from logging import getLogger
 import re
@@ -31,6 +32,7 @@ def identify_database_provider(
     if first is None:
         raise KeyError(f"Database accessor '{database_accessor}' not found in duckdb databases.")
     return DatabaseProvider(**dict(zip(column_names, first)))
+
 
 def execute_query(
     query: str,

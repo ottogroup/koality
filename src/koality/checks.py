@@ -106,18 +106,22 @@ class DataQualityCheck(abc.ABC):
             data exists.
         """
         is_empty_table = False
-        empty_table = ""
         try:
-            result = execute_query(self.assemble_data_exists_query(), duckdb_client, self.database_provider,).fetchone()
+            result = execute_query(
+                self.assemble_data_exists_query(),
+                duckdb_client,
+                self.database_provider,
+            ).fetchone()
         except duckdb.Error:
             empty_table = f"Error while executing data check query on {self.table}"
         else:
-            is_empty_table = bool(result and result[0])
+            empty_table = result[0] if result else self.table
+            is_empty_table = bool(empty_table)
 
         if not is_empty_table:
             return {}
 
-        date = self.date_filter_value if hasattr(self, "date") else dt.datetime.today().isoformat()
+        date = self.date_filter_value if hasattr(self, "date_filter_value") else dt.datetime.today().isoformat()
         self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
         self.status = "FAIL"
         return {
@@ -131,7 +135,11 @@ class DataQualityCheck(abc.ABC):
         data = []
         error = None
         try:
-            result = execute_query(query, duckdb_client, self.database_provider, )
+            result = execute_query(
+                query,
+                duckdb_client,
+                self.database_provider,
+            )
         except duckdb.Error as e:
             error = str(e)
         else:
@@ -153,6 +161,8 @@ class DataQualityCheck(abc.ABC):
         """
 
         result, error = self._check(duckdb_client, self.query)
+
+        print(result, error)
 
         check_value = result[0][self.name] if result else None
         check_value = float(check_value) if check_value is not None else None
@@ -180,7 +190,7 @@ class DataQualityCheck(abc.ABC):
         }
 
         if result_dict["RESULT"] == "FAIL":
-            value_string = f"{result_dict['VALUE']:.{FLOAT_PRECISION}f}" if result_dict['VALUE'] is not None else "NULL"
+            value_string = f"{result_dict['VALUE']:.{FLOAT_PRECISION}f}" if result_dict["VALUE"] is not None else "NULL"
             self.message = (
                 f"{self.shop_id}: Metric {self.name} failed on {self.date_filter_value}{self.date_info_string} for {self.table}."
                 f" Value {value_string} is not between {self.lower_threshold} and {self.upper_threshold}.{self.extra_info_string}"
@@ -319,6 +329,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         main_query = self.query_boilerplate(self.transformation_statement())
 
         if where_statement := self.assemble_where_statement(self.filters):
+            print(main_query + "\n" + where_statement)
             return main_query + "\n" + where_statement
 
         return main_query
@@ -367,7 +378,7 @@ class NullRatioCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
+        extra_info: str | None = None,
         **kwargs,
     ):
         super().__init__(
@@ -387,7 +398,7 @@ class NullRatioCheck(ColumnTransformationCheck):
         return f"""
             CASE 
                 WHEN COUNT(*) = 0 THEN 0.0
-                ELSE DIVIDE(COUNTIF({self.check_column} IS NULL), COUNT(*))
+                ELSE COUNTIF({self.check_column} IS NULL) / COUNT(*)
             END AS {self.name}
         """
 
@@ -445,7 +456,7 @@ class RegexMatchCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
-        return f"""AVG(IF(REGEXP_CONTAINS({self.check_column}, "{self.regex_to_match}"), 1, 0)) AS {self.name}"""
+        return f"""AVG(IF(REGEXP_MATCHES({self.check_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
 
 
 class ValuesInSetCheck(ColumnTransformationCheck):
@@ -578,7 +589,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
         main_query += (
             "WHERE\n    "
-            + f"{self.date_filter_column} BETWEEN TIMESTAMP_SUB('{self.date_filter_value}', INTERVAL 14 DAY) AND '{self.date_filter_value}'"
+            + f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -748,7 +759,7 @@ class OccurrenceCheck(ColumnTransformationCheck):
             database_accessor=database_accessor,
             database_provider=database_provider,
             transformation_name=f"occurrence_{max_or_min}",
-            **kwargs
+            **kwargs,
         )
 
     def transformation_statement(self) -> str:
@@ -1145,28 +1156,6 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             filter_name: filer_dict for filter_name, filer_dict in self.filters.items() if filter_name != "date"
         }
 
-    # UDF for calculating exact percentiles in BigQuery
-    # https://medium.com/@rakeshmohandas/how-to-calculate-exact-quantiles-percentiles-in-bigquery-using-6465d69fc136
-    _percentile_udf = '''
-    CREATE TEMP FUNCTION
-    ExactPercentile(arr ARRAY<FLOAT64>,
-    percentile FLOAT64)
-    RETURNS FLOAT64
-    LANGUAGE js AS """
-    var sortedArray = arr.slice().sort(function(a, b) {
-    return a - b;
-    });
-    var index = (sortedArray.length - 1) * percentile;
-    var lower = Math.floor(index);
-    var upper = Math.ceil(index);
-    if (lower === upper) {
-    return sortedArray[lower];
-    }
-    var fraction = index - lower;
-    return sortedArray[lower] * (1 - fraction) + sortedArray[upper] * fraction;
-    """;
-    '''
-
     def transformation_statement(self) -> str:
         # TODO: currently we only raise an error if there is no data for the date
         #       we could also raise an error if there is not enough data for the
@@ -1179,14 +1168,6 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             where_statement = self.assemble_where_statement(self.filters)
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
         return f"""
-          DECLARE slice_count INT64;
-          SET slice_count = (SELECT COUNT(*) FROM {self.table} WHERE {self.date_filter_column} = "{self.date_filter_value}");
-          IF slice_count = 0 THEN
-            RAISE USING MESSAGE = 'No data for {self.date_filter_value} in {self.table}!';
-          END IF;
-
-          {self._percentile_udf}
-
           WITH
           raw AS (
             SELECT
@@ -1196,26 +1177,26 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             FROM
                 {self.table}
             WHERE
-                DATE({self.date_filter_column}) BETWEEN DATE_SUB("{self.date_filter_value}", INTERVAL {self.interval_days} DAY)
-                AND "{self.date_filter_value}"
+                DATE({self.date_filter_column}) BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.interval_days} DAY)
+                AND DATE '{self.date_filter_value}'
                 {where_statement}
           ),
           compare AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} < "{self.date_filter_value}"
+            SELECT * FROM raw WHERE {self.date_filter_column} < '{self.date_filter_value}'
           ),
           slice AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} = "{self.date_filter_value}"
+            SELECT * FROM raw WHERE {self.date_filter_column} = '{self.date_filter_value}'
           ),
           percentiles AS (
             SELECT
-              ExactPercentile(ARRAY_AGG(CAST({self.check_column} AS FLOAT64)), 0.25) AS q25,
-              ExactPercentile(ARRAY_AGG(CAST({self.check_column} AS FLOAT64)), 0.75) AS q75
+              QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.25) AS q25,
+              QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.75) AS q75
             FROM
               compare
           ),
           stats AS (
             SELECT
-              * except ({self.check_column}),
+              * exclude ({self.check_column}),
               {self.check_column} AS {self.name},
               (percentiles.q25 - {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS lower_threshold,
               (percentiles.q75 + {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS upper_threshold,
