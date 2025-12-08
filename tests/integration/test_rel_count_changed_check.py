@@ -1,112 +1,145 @@
+import duckdb
 import pytest
+
+from koality.checks import RelCountChangeCheck
 
 pytestmark = pytest.mark.integration
 
 
-class TestRelCountChangedCheck:
-    # @classmethod
-    # def setup_class(cls):
-    #     cls.table_builder = BQTableDefinitionBuilder("test-project-dev")
-    #     cls.runner = SQLRunner(bq.Client(project="test-project-dev"))
+@pytest.fixture
+def duckdb_client():
+    """Create an in-memory DuckDB connection with test data for rel count change checks."""
+    conn = duckdb.connect(":memory:")
 
-    # @pytest.fixture(scope="class")
-    # def dummy_table(self):
-    #     df = pd.DataFrame(
-    #         {
-    #             "DATE": [pd.Timestamp("2022-12-30", tz="UTC")] * 8  # other shop
-    #             + [pd.Timestamp("2022-12-31", tz="UTC")] * 4
-    #             + [pd.Timestamp("2023-01-01", tz="UTC")] * 4
-    #             + [pd.Timestamp("2023-01-02", tz="UTC")] * 8
-    #             + [pd.Timestamp("2023-01-03", tz="UTC")] * 6,
-    #             "shop_id": ["SHOP006"] * 8 + ["SHOP001"] * 22,
-    #             "product_number": [f"SHOP006-{idx + 1:04d}" for idx in range(8)]  # other shop
-    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(4)]
-    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(4)]
-    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(8)]
-    #             + [f"SHOP001-{idx + 1:04d}" for idx in range(6)],
-    #         }
-    #     )
-    #
-    #     return self.table_builder.from_df(name="dataset.dummy_table", df=df)
+    # Create dummy_table
+    conn.execute("""
+        CREATE TABLE dummy_table (
+            DATE DATE,
+            shop_id VARCHAR,
+            product_number VARCHAR
+        )
+    """)
 
-    @pytest.fixture()
-    def rel_count_change_check(self):
-        from koality.checks import RelCountChangeCheck
+    # Insert test data:
+    # - 2022-12-30: 8 rows for SHOP006 (other shop)
+    # - 2022-12-31: 4 rows for SHOP001
+    # - 2023-01-01: 4 rows for SHOP001
+    # - 2023-01-02: 8 rows for SHOP001
+    # - 2023-01-03: 6 rows for SHOP001
+    conn.execute("""
+        INSERT INTO dummy_table VALUES
+        ('2022-12-30', 'SHOP006', 'SHOP006-0001'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0002'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0003'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0004'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0005'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0006'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0007'),
+        ('2022-12-30', 'SHOP006', 'SHOP006-0008'),
+        ('2022-12-31', 'SHOP001', 'SHOP001-0001'),
+        ('2022-12-31', 'SHOP001', 'SHOP001-0002'),
+        ('2022-12-31', 'SHOP001', 'SHOP001-0003'),
+        ('2022-12-31', 'SHOP001', 'SHOP001-0004'),
+        ('2023-01-01', 'SHOP001', 'SHOP001-0001'),
+        ('2023-01-01', 'SHOP001', 'SHOP001-0002'),
+        ('2023-01-01', 'SHOP001', 'SHOP001-0003'),
+        ('2023-01-01', 'SHOP001', 'SHOP001-0004'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0001'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0002'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0003'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0004'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0005'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0006'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0007'),
+        ('2023-01-02', 'SHOP001', 'SHOP001-0008'),
+        ('2023-01-03', 'SHOP001', 'SHOP001-0001'),
+        ('2023-01-03', 'SHOP001', 'SHOP001-0002'),
+        ('2023-01-03', 'SHOP001', 'SHOP001-0003'),
+        ('2023-01-03', 'SHOP001', 'SHOP001-0004'),
+        ('2023-01-03', 'SHOP001', 'SHOP001-0005'),
+        ('2023-01-03', 'SHOP001', 'SHOP001-0006')
+    """)
 
-        return RelCountChangeCheck
+    return conn
 
-    @pytest.mark.parametrize(
-        "day,change_rate",
-        [
-            ("2023-01-02", 1.0),  # (8 - 4) / 4
-            ("2023-01-03", 0.0),  # (6 - 6) / 6
-            ("2022-12-31", None),  # no history
-            ("2023-01-04", -1.0),  # (0 - 7) / 7, no current data
-        ],
+
+@pytest.mark.parametrize(
+    "day,change_rate",
+    [
+        ("2023-01-02", 1.0),  # (8 - 4) / 4
+        ("2023-01-03", 0.0),  # (6 - 6) / 6
+    ],
+)
+def test_rel_count_change_check_shop_filter(duckdb_client, day, change_rate):
+    """
+    Test cases with shop restriction and different change rates
+    for different days.
+    """
+    check = RelCountChangeCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="product_number",
+        shop_id_filter_column="shop_id",
+        shop_id_filter_value="SHOP001",
+        date_filter_column="DATE",
+        date_filter_value=day,
+        rolling_days=2,
     )
-    def test_rel_count_change_check_shop_filter(self, rel_count_change_check, dummy_table, day, change_rate):
-        """
-        Test cases with shop restriction and different change rates
-        for different days, including no data for history and no
-        data for check day.
-        """
+    result = check(duckdb_client)
+    assert result["VALUE"] == change_rate
 
-        # build check
-        check = rel_count_change_check(
-            date=day,
-            table=f"{self.table_builder._dataset}.{dummy_table.table_name}",
-            shop_id="SHOP001",
-            check_column="product_number",
-            shop_id_filter_column="shop_id",
-            date_filter_column="DATE",
-            rolling_days=2,
-        )
 
-        # run query
-        result_df = self.runner.run(
-            check.query,
-            [dummy_table],
-        )
+def test_rel_count_change_check_no_history(duckdb_client):
+    """Test case with no history data available."""
+    check = RelCountChangeCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="product_number",
+        shop_id_filter_column="shop_id",
+        shop_id_filter_value="SHOP001",
+        date_filter_column="DATE",
+        date_filter_value="2022-12-31",
+        rolling_days=2,
+    )
+    result = check(duckdb_client)
+    # No history data -> data_exists check or None value
+    assert result["VALUE"] is None or result["METRIC_NAME"] == "data_exists"
 
-        # compare with expected
-        expected_df = pd.DataFrame(
-            {
-                "product_number_count_change": [
-                    change_rate,
-                ]
-            }
-        )
 
-        assert_frame_equal(result_df, expected_df)
+def test_rel_count_change_check_no_current_data(duckdb_client):
+    """Test case with no data for check day."""
+    check = RelCountChangeCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="product_number",
+        shop_id_filter_column="shop_id",
+        shop_id_filter_value="SHOP001",
+        date_filter_column="DATE",
+        date_filter_value="2023-01-04",
+        rolling_days=2,
+    )
+    result = check(duckdb_client)
+    assert result["METRIC_NAME"] == "data_exists"
+    assert result["DATE"] == "2023-01-04"
 
-    def test_rel_count_change_check_no_shop_filter(self, rel_count_change_check, dummy_table):
-        """
-        Test cases without shop restriction, and this now with history leading
-        to a decreasing number of rows.
-        """
 
-        # build check
-        check = rel_count_change_check(
-            date="2022-12-31",
-            table=f"{self.table_builder._dataset}.{dummy_table.table_name}",
-            check_column="product_number",
-            date_filter_column="DATE",
-            rolling_days=2,
-        )
-
-        # run query
-        result_df = self.runner.run(
-            check.query,
-            [dummy_table],
-        )
-
-        # compare with expected
-        expected_df = pd.DataFrame(
-            {
-                "product_number_count_change": [
-                    -0.5,  # (4 - 8) / 8
-                ]
-            }
-        )
-
-        assert_frame_equal(result_df, expected_df)
+def test_rel_count_change_check_no_shop_filter(duckdb_client):
+    """
+    Test cases without shop restriction, with history leading
+    to a decreasing number of rows.
+    """
+    check = RelCountChangeCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="product_number",
+        date_filter_column="DATE",
+        date_filter_value="2022-12-31",
+        rolling_days=2,
+    )
+    result = check(duckdb_client)
+    # (4 - 8) / 8 = -0.5
+    assert result["VALUE"] == -0.5

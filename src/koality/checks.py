@@ -398,7 +398,7 @@ class NullRatioCheck(ColumnTransformationCheck):
         return f"""
             CASE 
                 WHEN COUNT(*) = 0 THEN 0.0
-                ELSE COUNTIF({self.check_column} IS NULL) / COUNT(*)
+                ELSE ROUND(COUNTIF({self.check_column} IS NULL) / COUNT(*), 3)
             END AS {self.name}
         """
 
@@ -891,7 +891,7 @@ class MatchRateCheck(DataQualityCheck):
             {right_column_statement},
             TRUE AS in_right_table
         FROM
-            `{f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}`
+            {f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}
         {self.assemble_where_statement(self.filters_right)}
         ),
 
@@ -899,12 +899,15 @@ class MatchRateCheck(DataQualityCheck):
         SELECT
             *
         FROM
-            `{f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}`
+            {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
         {self.assemble_where_statement(self.filters_left)}
         )
 
         SELECT
-            ROUND(SAFE_DIVIDE(COUNTIF(in_right_table IS TRUE), COUNT(*)), 3) AS {self.name}
+            CASE 
+                WHEN COUNT(*) = 0 THEN 0.0
+                ELSE ROUND(COUNTIF(in_right_table IS TRUE) / COUNT(*), 3)
+            END AS {self.name}
         FROM
             lefty
         LEFT JOIN
@@ -927,7 +930,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS right_counter,
             FROM
-                `{f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}`
+                {f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}
             {self.assemble_where_statement(self.filters_right)}
         ),
 
@@ -935,7 +938,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS left_counter,
             FROM
-                `{f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}`
+                {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
             {self.assemble_where_statement(self.filters_left)}
         )
 
@@ -1029,10 +1032,10 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             {self.date_filter_column},
             COUNT(DISTINCT {self.check_column}) AS dist_cnt
         FROM
-            `{f"{self.database_accessor}." if self.database_accessor else ""}{self.table}`
+            {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
         WHERE
-            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date_filter_value}", INTERVAL {self.rolling_days} DAY)
-            AND "{self.date_filter_value}"
+            {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
+            AND '{self.date_filter_value}'
         {where_statement}
         GROUP BY
             {self.date_filter_column}
@@ -1044,9 +1047,9 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         FROM
             base
         WHERE
-            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date_filter_value}", INTERVAL {self.rolling_days} DAY)
+            {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
         AND
-            TIMESTAMP_SUB("{self.date_filter_value}", INTERVAL 1 DAY)
+            (DATE '{self.date_filter_value}' - INTERVAL 1 DAY)
         ),
 
         -- Helper is needed to cover case where no current data is available
@@ -1055,14 +1058,17 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             MAX(dist_cnt) AS dist_cnt
           FROM
             (
-                SELECT dist_cnt FROM base WHERE {self.date_filter_column} = "{self.date_filter_value}"
+                SELECT dist_cnt FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
                 UNION ALL
                 SELECT 0 AS dist_cnt
             )
         )
 
         SELECT
-            ROUND(SAFE_DIVIDE((dist_cnt - rolling_avg), rolling_avg), 3) AS {self.name}
+            CASE 
+                WHEN rolling_avg = 0 THEN 0.0
+                ELSE ROUND((dist_cnt - rolling_avg) / rolling_avg, 3) 
+            END AS {self.name}
         FROM
             dist_cnt_helper
         JOIN
