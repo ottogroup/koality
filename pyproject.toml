@@ -6,6 +6,8 @@ authors = [
     { name = "Team PiT" }
 ]
 description = "Library for data checks and data quality monitoring based on duckdb."
+readme = "README.md"
+license = { file = "LICENSE.md" }
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.3",
