@@ -1,11 +1,11 @@
 [project]
 name = "koality"
 version = "0.1.0"
-description = "Library for data checks and data quality monitoring."
 authors = [
     { name = "Norbert Maager" },
     { name = "Team PiT" }
 ]
+description = "Library for data checks and data quality monitoring based on duckdb."
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.3",
