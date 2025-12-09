@@ -3,7 +3,7 @@
 The following people have contributed to this project:
 
 | Name              | GitHub Handle                                      |
-| ----------------- | -------------------------------------------------- |
+|-------------------|----------------------------------------------------|
 | Andreas Lattner   | [@alattner](https://github.com/alattner)           |
 | Benjamin Gutzmann | [@gutzbenj](https://github.com/gutzbenj)           |
 | Dominik Haitz     | [@dhaitz](https://github.com/dhaitz)               |
