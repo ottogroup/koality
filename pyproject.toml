@@ -8,6 +8,25 @@ authors = [
 description = "Library for data checks and data quality monitoring based on duckdb."
 readme = "README.md"
 license = { file = "LICENSE.md" }
+keywords = [
+    "data-quality",
+    "data-validation",
+    "duckdb",
+    "data-checks",
+    "data-monitoring",
+    "etl",
+    "data-pipeline",
+    "data-engineering",
+    "data-testing",
+    "data-profiling",
+    "data-observability",
+    "sql",
+    "analytics",
+    "data-warehouse",
+    "cli",
+    "yaml",
+    "pydantic",
+]
 requires-python = ">=3.12"
 dependencies = [
     "click>=8.1.3",
