@@ -9,7 +9,7 @@ name: string                    # Name of the configuration
 database_setup: string          # SQL to set up database connections
 database_accessor: string       # Database accessor prefix for tables
 
-global_defaults:                # Global default settings
+defaults:                # Global default settings
   monitor_only: bool            # If true, checks don't fail the run
   result_table: string          # Table to store results (optional)
   log_path: string              # Path to write failed checks log (optional)
@@ -20,7 +20,7 @@ global_defaults:                # Global default settings
 
 check_bundles:                  # List of check bundles
   - name: string                # Bundle name
-    default_args:               # Default arguments for checks in this bundle
+    defaults:               # Default arguments for checks in this bundle
       table: string
       check_column: string
       # ... other defaults
@@ -50,7 +50,7 @@ Check bundles group related checks together and can define shared default argume
 ```yaml
 check_bundles:
   - name: orders_quality
-    default_args:
+    defaults:
       table: orders
       date_filter_column: order_date
     checks:
@@ -222,7 +222,7 @@ database_setup: |
   ATTACH 'warehouse.duckdb' AS warehouse;
 database_accessor: warehouse
 
-global_defaults:
+defaults:
   monitor_only: false
   result_table: dqm_results
   log_path: /var/log/dqm/failed_checks.log
@@ -231,7 +231,7 @@ global_defaults:
 
 check_bundles:
   - name: orders
-    default_args:
+    defaults:
       table: orders
     checks:
       - check_type: NullRatioCheck
@@ -243,7 +243,7 @@ check_bundles:
         lower_threshold: 100
 
   - name: products
-    default_args:
+    defaults:
       table: products
     checks:
       - check_type: DuplicateCheck

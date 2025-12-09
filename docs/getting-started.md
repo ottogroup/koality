@@ -28,7 +28,7 @@ database_setup: |
   ATTACH 'my_database.duckdb' AS my_db;
 database_accessor: my_db
 
-global_defaults:
+defaults:
   monitor_only: false
   result_table: dqm_results
   date_filter_column: date
@@ -36,7 +36,7 @@ global_defaults:
 
 check_bundles:
   - name: orders_checks
-    default_args:
+    defaults:
       table: orders
     checks:
       - check_type: NullRatioCheck

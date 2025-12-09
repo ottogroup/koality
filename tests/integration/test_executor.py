@@ -44,13 +44,13 @@ def config_file_success(tmp_path):
         database_setup: ""
         database_accessor: ""
 
-        global_defaults:
+        defaults:
           monitor_only: False
           log_path: {tmp_path}/message.txt
 
         check_bundles:
           - name: check-bundle-1
-            default_args:
+            defaults:
               check_type: CountCheck
               table: dummy_table
               check_column: "*"
@@ -61,7 +61,7 @@ def config_file_success(tmp_path):
               - shop_id: SHOP002
 
           - name: check-bundle-2
-            default_args:
+            defaults:
               check_type: CountCheck
               table: dummy_table
               check_column: "*"
@@ -83,14 +83,14 @@ def config_file_failure(tmp_path):
         f"""
         name: koality-failure
 
-        global_defaults:
+        defaults:
           monitor_only: False
           result_table: dataquality.data_koality_monitoring
           log_path: {tmp_path}/message.txt
 
         check_bundles:
           - name: check-bundle-1
-            default_args:
+            defaults:
               check_type: SuccessCheck
             checks:
               - shop_id: SHOP001
@@ -115,13 +115,13 @@ def config_file_failure_v2(tmp_path):
         database_setup: ""
         database_accessor: ""
 
-        global_defaults:
+        defaults:
           monitor_only: False
           log_path: {tmp_path}/message.txt
 
         check_bundles:
           - name: check-bundle-1
-            default_args:
+            defaults:
               check_type: CountCheck
               table: dummy_table
               check_column: "*"
@@ -149,13 +149,13 @@ def config_file_missing_data_v2(tmp_path):
         database_setup: ""
         database_accessor: ""
 
-        global_defaults:
+        defaults:
           monitor_only: False
           log_path: {tmp_path}/message.txt
 
         check_bundles:
           - name: check-bundle-1
-            default_args:
+            defaults:
               check_type: CountCheck
               table: empty_table
               check_column: "*"

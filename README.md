@@ -79,7 +79,7 @@ dependencies = [
 # koality_config.yaml
 name: My Data Quality Checks
 
-global_defaults:
+defaults:
   date_filter_column: date
   date: yesterday
   result_table: my_project.dqm.results
@@ -88,7 +88,7 @@ global_defaults:
 
 check_bundles:
   - name: null_ratio_checks
-    default_args:
+    defaults:
       check_type: NullRatioCheck
       table: my_project.dataset.orders
       lower_threshold: 0
@@ -113,8 +113,8 @@ Results are persisted to your configured result table and failures are logged to
 
 Koality uses a hierarchical configuration system where more specific settings override general ones:
 
-1. **`global_defaults`**: Base settings for all checks (result table, persistence, filters)
-2. **`check_bundles.default_args`**: Bundle-level defaults (check type, table, thresholds)
+1. **`defaults`**: Base settings for all checks (result table, persistence, filters)
+2. **`check_bundles.defaults`**: Bundle-level defaults (check type, table, thresholds)
 3. **`checks`**: Individual check configurations (specific columns, custom thresholds)
 
 ## Filter System
@@ -122,7 +122,7 @@ Koality uses a hierarchical configuration system where more specific settings ov
 Apply dynamic filters to check specific data subsets:
 
 ```yaml
-global_defaults:
+defaults:
   date_filter_column: created_at
   date: yesterday
   shop_id_filter_column: shop_id

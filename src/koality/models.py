@@ -179,7 +179,7 @@ class _IqrOutlierCheck(_SingleTableCheck):
 
 class _CheckBundle(BaseModel):
     name: str
-    default_args: _LocalDefaults = Field(default_factory=_LocalDefaults)
+    defaults: _LocalDefaults = Field(default_factory=_LocalDefaults)
     checks: list[CHECK]
 
 
@@ -187,23 +187,23 @@ class Config(BaseModel):
     name: str
     database_setup: str
     database_accessor: str
-    global_defaults: _GlobalDefaults
+    defaults: _GlobalDefaults
     check_bundles: list[_CheckBundle]
 
     @model_validator(mode="before")
     @classmethod
     def propagate_defaults_to_checks(cls, data: dict) -> dict:
-        """Merge global_defaults and default_args into each check before validation.
+        """Merge defaults and check_bundle.defaults into each check before validation.
 
         Merge order (later overrides earlier):
-        1. global_defaults
-        2. bundle default_args
+        1. defaults
+        2. bundle defaults
         3. check-specific values
         """
         if not isinstance(data, dict):
             return data
 
-        global_defaults = data.get("global_defaults", {})
+        defaults = data.get("defaults", {})
         check_bundles = data.get("check_bundles", [])
 
         if not check_bundles:
@@ -215,14 +215,14 @@ class Config(BaseModel):
                 updated_bundles.append(bundle)
                 continue
 
-            default_args = bundle.get("default_args", {})
+            bundle_defaults = bundle.get("defaults", {})
             checks = bundle.get("checks", [])
 
             merged_checks = []
             for check in checks:
                 if isinstance(check, dict):
-                    # Merge order: global_defaults -> default_args -> check
-                    merged = {**global_defaults, **default_args, **check}
+                    # Merge order: defaults -> check_bundle.defaults -> check
+                    merged = {**defaults, **bundle_defaults, **check}
                     merged_checks.append(merged)
                 else:
                     merged_checks.append(check)

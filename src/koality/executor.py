@@ -107,9 +107,9 @@ class CheckExecutor:
         self.jobs_: List = []
 
         self.result_dicts: List = []
-        self.result_table = self.config.global_defaults.result_table
-        self.persist_results = self.config.global_defaults.persist_results
-        self.log_path = self.config.global_defaults.log_path
+        self.result_table = self.config.defaults.result_table
+        self.persist_results = self.config.defaults.persist_results
+        self.log_path = self.config.defaults.log_path
 
     @staticmethod
     def aggregate_values(value_list) -> str:
