@@ -357,14 +357,16 @@ class NullRatioCheck(ColumnTransformationCheck):
     Example:
 
     NullRatioCheck(
-        date="2023-01-01",  # optional
+        database_accessor="project.dataset",
+        database_provider=None,
         table="project.dataset.table",
-        shop_id="SHOP01",  # optional
         check_column="orders",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="date",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.9,
-        upper_threshold=1.0
+        upper_threshold=1.0,
     )
     """
 
@@ -416,13 +418,15 @@ class RegexMatchCheck(ColumnTransformationCheck):
     Example:
 
     RegexMatchCheck(
-        date="2023-01-01",  # optional
+        database_accessor="project.dataset",
+        database_provider=None,
         table="project.dataset.table",
-        check_column="^SHOP[0-9]{2}-.*"
         check_column="orders",
+        regex_to_match="^SHOP[0-9]{2}-.*",
         date_filter_column="date",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.9,
-        upper_threshold=1.0
+        upper_threshold=1.0,
     )
     """
 
@@ -475,15 +479,17 @@ class ValuesInSetCheck(ColumnTransformationCheck):
     Example:
 
     ValuesInSetCheck(
-        date="2023-01-01",  # optional
+        database_accessor="project.dataset",
+        database_provider=None,
         table="project.dataset.table",
-        shop_id="SHOP01",  # optional
         check_column="category",
         value_set='("toys", "shoes")',
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="date",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.9,
-        upper_threshold=1.0
+        upper_threshold=1.0,
     )
     """
 
@@ -534,16 +540,19 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
     Example:
 
-    ValuesInSetCheck(
-        date="2023-01-01",  # mandatory
+    RollingValuesInSetCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.orders",
-        shop_id="SHOP01",  # optional
         check_column="category",
         value_set='("toys", "shoes")',
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # mandatory
+        date_filter_value="2023-01-01",  # mandatory
         lower_threshold=0.9,
         upper_threshold=1.0,
+    )
     """
 
     def __init__(
@@ -607,12 +616,14 @@ class DuplicateCheck(ColumnTransformationCheck):
     Example:
 
     DuplicateCheck(
-        date="2023-01-01",  # optional
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.0,
         upper_threshold=0.0,
     )
@@ -662,15 +673,17 @@ class CountCheck(ColumnTransformationCheck):
     Example:
 
     CountCheck(
-        date="2023-01-01",  # optional
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         distinct=True,
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=10000.0,
-        upper_threshold=99999.0
+        upper_threshold=99999.0,
     )
     """
 
@@ -733,15 +746,17 @@ class OccurrenceCheck(ColumnTransformationCheck):
     Example:
 
     OccurrenceCheck(
-        max_or_min="max,
-        date="2023-01-01",  # optional
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
+        max_or_min="max",
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0,
-        upper_threshold=500
+        upper_threshold=500,
     )
     """
 
@@ -803,16 +818,18 @@ class MatchRateCheck(DataQualityCheck):
 
     Example:
 
-    check = match_rate_check(
-        date="2023-01-01",  # optional
+    MatchRateCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         left_table="my-gcp-project.SHOP01.pdp_views",
         right_table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         join_columns_left=["DATE", "product_number_v2"],
         join_columns_right=["DATE", "product_number"],
         check_column="product_number",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
     )
     """
 
@@ -970,15 +987,17 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
     Example:
 
     RelCountChangeCheck(
-        date="2023-01-01",  # mandatory
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         rolling_days=7,
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # mandatory
+        date_filter_value="2023-01-01",  # mandatory
         lower_threshold=-0.15,
-        upper_threshold=0.15
+        upper_threshold=0.15,
     )
     """
 
@@ -1104,13 +1123,17 @@ class IqrOutlierCheck(ColumnTransformationCheck):
     Example:
 
     IqrOutlierCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         check_column="num_orders",
         table="my-gcp-project.SHOP01.orders",
-        date="2023-01-01",
-        date_filter_column="DATE",  # optional
+        date_filter_column="DATE",
+        date_filter_value="2023-01-01",
         interval_days=14,
         how="both",  # check both upper and lower outliers
-        iqr_factor=1.5
+        iqr_factor=1.5,
+        shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
     )
     """
 
