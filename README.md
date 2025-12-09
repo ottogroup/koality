@@ -31,7 +31,7 @@ Breaking changes should be expected until a 1.0 release, so version pinning is r
 
 ## Documentation
 
-For comprehensive documentation, visit the [Koality Documentation](https://ottogroup.github.io/koality/).
+For comprehensive documentation, visit the [Koality Documentation](https://ottogroup.github.io/koality/latest).
 
 ## Core Features
 
