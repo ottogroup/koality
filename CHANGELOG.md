@@ -32,6 +32,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Comprehensive documentation with MkDocs
 - Unit and integration test suites
 - GitHub Actions workflows for CI/CD and releases
+- Use common `defaults` key instead of `global_defaults` and `default_args`
 
 [Unreleased]: https://github.com/ottogroup/koality/compare/v0.1.0...HEAD
 [0.1.0]: https://github.com/ottogroup/koality/releases/tag/v0.1.0
