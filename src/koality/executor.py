@@ -77,13 +77,13 @@ DATA_TYPES: dict[str, dict[str, str]] = defaultdict(
 class CheckExecutor:
     """
     Provides all the logic to actually run checks. It contains methods to
-    load configuration files, to execute checks, to create the failed
-    checks log, and to export DQM results to a BQ table.
+    execute checks, to create the failed checks log, and to export DQM
+    results to a database table.
 
     Args:
-        config_path: Path to koality configuration file
-        bq_client: BigQuery client for interacting with BigQuery
-        storage_client: Storage client for interacting with GCP buckets (optional)
+        config: Koality configuration object
+        duckdb_client: DuckDB client for interacting with DuckDB (optional).
+            If not provided, an in-memory connection will be created.
     """
 
     def __init__(

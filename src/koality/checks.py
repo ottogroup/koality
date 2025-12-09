@@ -251,7 +251,16 @@ class DataQualityCheck(abc.ABC):
 
         Args:
             filters: A dict containing filter specifications, e.g.,
-            {'shop_id': {'column': 'shop_code', 'value': 'SHOP01'}, 'date': {'column': 'date', 'value': '2023-01-01'}}
+                `{
+                    'shop_id': {
+                        'column': 'shop_code',
+                        'value': 'SHOP01'
+                    },
+                    'date': {
+                        'column': 'date',
+                        'value': '2023-01-01'
+                    }
+                }`
 
         Returns:
             A WHERE statement to restrict the data being used for the check, e.g.,
@@ -801,15 +810,15 @@ class MatchRateCheck(DataQualityCheck):
     used for joining the data. If not, join_columns will be used as fallback.
 
     Args:
-        left_table: Name of BQ table for left part of join
+        left_table: Name of table for left part of join
                     (e.g., "my-gcp-project.SHOP01.identifier_base")
-        right_table: Name of BQ table for right part of join
+        right_table: Name of table for right part of join
                      (e.g., "my-gcp-project.SHOP01.feature_baseline")
         check_column: Name of column to be checked (e.g., "product_number")
         join_columns: List of columns to join data on (e.g., ["PREDICTION_DATE", "product_number"])
-        left_join_columns: List of columns of left table to join data on
+        join_columns_left: List of columns of left table to join data on
                            (e.g., ["BQ_PARTITIONTIME", "productId"])
-        right_join_columns: List of columns of right table to join data on
+        join_columns_right: List of columns of right table to join data on
                             (e.g., ["PREDICTION_DATE", "product_number"])
         lower_threshold: Check will fail if check result < lower_threshold
         upper_threshold: Check will fail if check result > upper_threshold
@@ -973,12 +982,12 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
     number of historic days before the check date.
 
     Args:
-        date: The date where the check should be performed (e.g., "2023-01-01")
-        table: Name of BQ table (e.g., "my-gcp-project.SHOP01.feature_category")
+        table: Name of table (e.g., "my-gcp-project.SHOP01.feature_category")
         check_column: Name of column to be checked (e.g., "category")
         rolling_days: The number of historic days to be taken into account for
                       the historic average baseline for the comparison (e.g., 7).
         date_filter_column: The name of the date column
+        date_filter_value: The date where the check should be performed (e.g., "2023-01-01")
         lower_threshold: Check will fail if check result < lower_threshold
         upper_threshold: Check will fail if check result > upper_threshold
         monitor_only: If True, no checks will be performed
