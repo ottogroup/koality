@@ -57,6 +57,12 @@ dependencies = [
     "pyyaml>=6.0",
 ]
 
+[project.urls]
+Repository = "https://github.com/ottogroup/koality/"
+Documentation = "https://ottogroup.github.io/koality/latest/"
+Issues = "https://github.com/ottogroup/koality/issues"
+Releases = "https://github.com/ottogroup/koality/releases"
+
 [dependency-groups]
 dev = [
     "pytest>=7.2.0",
