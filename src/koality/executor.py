@@ -1,20 +1,77 @@
 """Module containing the actual check execution logic."""
 
+import datetime
 import logging
-from concurrent import futures
-from typing import List, Optional
+from collections import defaultdict
+from typing import List
 
-import pandas as pd
-import yaml
-from google.cloud import bigquery as bq
+import duckdb
 
-# Workaround for typing: https://github.com/python/mypy/issues/12985
-from google.cloud.storage import Client as StorageClient
-
-from koality.utils import resolve_dotted_name
+from koality.checks import (
+    CountCheck,
+    DataQualityCheck,
+    DuplicateCheck,
+    IqrOutlierCheck,
+    MatchRateCheck,
+    NullRatioCheck,
+    OccurrenceCheck,
+    RegexMatchCheck,
+    RelCountChangeCheck,
+    RollingValuesInSetCheck,
+    ValuesInSetCheck,
+)
+from koality.exceptions import DatabaseError
+from koality.models import CHECK_TYPE, Config
+from koality.utils import execute_query, identify_database_provider
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
+
+CHECK_MAP: dict[CHECK_TYPE, type[DataQualityCheck]] = {
+    "NullRatioCheck": NullRatioCheck,
+    "RegexMatchCheck": RegexMatchCheck,
+    "ValuesInSetCheck": ValuesInSetCheck,
+    "RollingValuesInSetCheck": RollingValuesInSetCheck,
+    "DuplicateCheck": DuplicateCheck,
+    "CountCheck": CountCheck,
+    "OccurrenceCheck": OccurrenceCheck,
+    "MatchRateCheck": MatchRateCheck,
+    "RelCountChangeCheck": RelCountChangeCheck,
+    "IqrOutlierCheck": IqrOutlierCheck,
+}
+
+# Mapping from DuckDB types to database-specific types
+# Structure: {duckdb_type: {database_type: target_type}} # noqa: ERA001
+# Uses defaultdict so unknown database types fall back to the original duckdb_type
+DATA_TYPES: dict[str, dict[str, str]] = defaultdict(
+    dict,
+    {
+        "VARCHAR": defaultdict(
+            lambda: "VARCHAR",
+            {
+                "bigquery": "STRING",
+            },
+        ),
+        "DATE": defaultdict(
+            lambda: "DATE",
+            {
+                "bigquery": "DATE",
+            },
+        ),
+        "TIMESTAMP": defaultdict(
+            lambda: "TIMESTAMP",
+            {
+                "bigquery": "TIMESTAMP",
+            },
+        ),
+        "NUMERIC": defaultdict(
+            lambda: "NUMERIC",
+            {
+                "bigquery": "FLOAT64",
+            },
+        ),
+    },
+)
 
 
 class CheckExecutor:
@@ -31,17 +88,18 @@ class CheckExecutor:
 
     def __init__(
         self,
-        config_path: str,
-        bq_client: bq.Client,
-        storage_client: Optional[StorageClient] = None,
+        config: Config,
+        duckdb_client: duckdb.DuckDBPyConnection | None = None,
         **kwargs,
     ) -> None:
-        self.config_path = config_path
-        self.bq_client = bq_client
-        self.storage_client = storage_client
+        self.config = config
+        if duckdb_client is not None:
+            self.duckdb_client = duckdb_client
+        else:
+            self.duckdb_client = duckdb.connect(":memory:")
+            self.duckdb_client.query(self.config.database_setup)
 
         self.kwargs = kwargs
-        self.config = self.read_check_config()
 
         self.checks: List = []
         self.check_failed = False
@@ -49,23 +107,13 @@ class CheckExecutor:
         self.jobs_: List = []
 
         self.result_dicts: List = []
-        self.result_table = self.config.get("global_defaults", {}).get("result_table", None)
-        self.persist_results = self.config.get("global_defaults", {}).get("persist_results", False)
-        self.log_path = self.config.get("global_defaults", {}).get("log_path", False)
+        self.result_table = self.config.global_defaults.result_table
+        self.persist_results = self.config.global_defaults.persist_results
+        self.log_path = self.config.global_defaults.log_path
 
     @staticmethod
     def aggregate_values(value_list) -> str:
         return ", ".join(sorted(set(value_list)))
-
-    def read_check_config(self) -> dict:
-        """read check config"""
-        with open(self.config_path, "r", encoding="utf-8") as f:
-            check_bundle_dict = yaml.safe_load(f.read())
-
-        # overwrite global defaults using kwargs
-        check_bundle_dict["global_defaults"] = check_bundle_dict["global_defaults"] | self.kwargs
-
-        return check_bundle_dict
 
     def execute_checks(self):
         """
@@ -75,30 +123,27 @@ class CheckExecutor:
         in a results dict for further processing.
         """
 
-        check_suite_dict = self.config
-        self.jobs_ = []
-        with futures.ThreadPoolExecutor() as exe:
-            for check_bundle in check_suite_dict["check_bundles"]:
-                for check in check_bundle["checks"]:
-                    check_with_default_args = check_bundle.get("default_args", {}) | check
-                    log.info(", ".join(["{}: {}".format(k, v) for k, v in check_with_default_args.items()]))
+        results = []
+        database_provider = None
+        if self.config.database_accessor:
+            database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
+        for check_bundle in self.config.check_bundles:
+            for check in check_bundle.checks:
+                check_factory = CHECK_MAP[check.check_type]
+                check_kwargs = check.model_dump(exclude={"check_type"}, exclude_unset=True)
+                check_kwargs["database_accessor"] = self.config.database_accessor
+                check_kwargs["database_provider"] = database_provider
+                check = check_factory(**check_kwargs)
+                self.checks.append(check)
 
-                    check_dict = check_suite_dict.get("global_defaults", {}) | check_with_default_args
-                    check_factory = resolve_dotted_name(check_dict["check_type"])
-                    check = check_factory(**check_dict)
-                    self.checks.append(check)
-
-                    self.jobs_.append(exe.submit(check, self.bq_client))
-
-        # wait for jobs to finish
-        completed_jobs = futures.wait(self.jobs_).done
+                results.append(check(self.duckdb_client))
 
         for check in self.checks:
             if check.status in ("FAIL", "ERROR"):
                 self.check_failed = True
                 break
 
-        self.result_dicts = [job.result() for job in completed_jobs]
+        self.result_dicts = results
 
     def _aggregate_checks_msgs(self, msg_list: list[str]) -> list[str]:
         """
@@ -124,14 +169,19 @@ class CheckExecutor:
         msgs_no_data = [msg for msg in msg_list if msg.startswith("No data")]
 
         # Group and aggregate messages
-        df_msgs = pd.DataFrame({"orig_msg": msgs_no_data})
-        df_msgs["table_part"] = df_msgs.orig_msg.map(lambda x: x.split(":")[0])
-        df_msgs["shop_id"] = df_msgs.orig_msg.map(lambda x: x.split(":")[1].strip())
-        df_grouped_shops = (
-            df_msgs[["table_part", "shop_id"]].groupby("table_part").agg(self.aggregate_values).reset_index()
-        )
+        grouped_data = {}
+        for msg in msgs_no_data:
+            parts = msg.split(":", 1)
+            if len(parts) == 2:
+                table_part = parts[0]
+                shop_id = parts[1].strip()
+                if table_part not in grouped_data:
+                    grouped_data[table_part] = []
+                grouped_data[table_part].append(shop_id)
 
-        msgs_no_data = [f"{table_part}: {shop_id}" for _, table_part, shop_id in df_grouped_shops.itertuples()]
+        msgs_no_data = [
+            f"{table_part}: {self.aggregate_values(shop_ids)}" for table_part, shop_ids in grouped_data.items()
+        ]
 
         return msgs_no_data + msgs_other
 
@@ -159,17 +209,35 @@ class CheckExecutor:
         result_no_data = [result for result in result_dicts if result["METRIC_NAME"] == "data_exists"]
 
         # Group and aggregate messages
-        if result_no_data:
-            df_results = pd.DataFrame(result_no_data)
-            df_grouped_shops = (
-                df_results.groupby(["DATE", "METRIC_NAME", "TABLE"]).agg(self.aggregate_values).reset_index()
-            )
-            df_grouped_shops["COLUMN"] = None
-            df_grouped_shops["VALUE"] = None
-            df_grouped_shops["LOWER_THRESHOLD"] = None
-            df_grouped_shops["UPPER_THRESHOLD"] = None
-            df_grouped_shops["RESULT"] = "FAIL"
-            result_no_data = df_grouped_shops.to_dict(orient="records")
+        if not result_no_data:
+            return result_other
+
+        grouped_data = {}
+        for result in result_no_data:
+            key = (result["DATE"], result["METRIC_NAME"], result["TABLE"])
+            if key not in grouped_data:
+                grouped_data[key] = {
+                    "DATE": result["DATE"],
+                    "METRIC_NAME": result["METRIC_NAME"],
+                    "TABLE": result["TABLE"],
+                    "SHOP_ID": [],
+                }
+            grouped_data[key]["SHOP_ID"].append(result["SHOP_ID"])
+
+        result_no_data = [
+            {
+                "DATE": value["DATE"],
+                "METRIC_NAME": value["METRIC_NAME"],
+                "TABLE": value["TABLE"],
+                "SHOP_ID": self.aggregate_values(value["SHOP_ID"]),
+                "COLUMN": None,
+                "VALUE": None,
+                "LOWER_THRESHOLD": None,
+                "UPPER_THRESHOLD": None,
+                "RESULT": "FAIL",
+            }
+            for value in grouped_data.values()
+        ]
 
         return result_no_data + result_other
 
@@ -188,7 +256,7 @@ class CheckExecutor:
 
         return "\n".join(failed_checks_msgs)
 
-    def load_to_bq(self) -> None:
+    def load_to_database(self) -> None:
         """
         Persists koality's DQM results in a BQ table. The result table is partitioned by
         DATE. DQM data is always appended to table.
@@ -202,38 +270,96 @@ class CheckExecutor:
             log.info("No entries in results from checks, so no results were persisted.")
             return
 
+        now = datetime.datetime.now()
+
         # Copy rows first, cause INSERT_TIMESTAMP and AUTO value is only a BQ feature and not needed anywhere else
         results_with_it: list[dict] = self._aggregate_result_dicts(self.result_dicts).copy()
         # Add INSERT_TIMESTAMP col with AUTO value to automatically set insert_timestamp (BQ feature)
         for row in results_with_it:
-            row["INSERT_TIMESTAMP"] = "AUTO"
+            row["INSERT_TIMESTAMP"] = now
 
-        response = self.bq_client.insert_rows(
-            table=self.bq_client.get_table(table=self.result_table),
-            rows=results_with_it,
-        )
+        if self.config.database_accessor:
+            database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
+            query_create_or_replace_table = f"""
+                CREATE TABLE IF NOT EXISTS {self.result_table} (
+                    DATE {DATA_TYPES["DATE"][database_provider.type]},
+                    METRIC_NAME {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    TABLE {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    SHOP_ID {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    COLUMN {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    VALUE {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
+                    UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
+                    RESULT {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    INSERT_TIMESTAMP {DATA_TYPES["TIMESTAMP"][database_provider.type]} DEFAULT CURRENT_TIMESTAMP
+                )
+            """
+            try:
+                # make sure table exists
+                execute_query(
+                    query_create_or_replace_table,
+                    self.duckdb_client,
+                    database_provider,
+                )
+            except duckdb.Error as e:
+                raise DatabaseError(f"Could not create or replace table {self.result_table}") from e
 
-        if response:
-            raise ValueError(f"response {response} could not be inserted into table")
+            # Convert results_with_it to VALUES clause
+            values_clause = ", ".join(
+                [
+                    f"""
+                    (
+                        "{row["DATE"]}",
+                        "{row["METRIC_NAME"]}",
+                        "{row["TABLE"]}",
+                        "{row["SHOP_ID"]}",
+                        "{row["COLUMN"]}",
+                        {row["VALUE"] if row["VALUE"] is not None else "NULL"},
+                        {row["LOWER_THRESHOLD"]},
+                        {row["UPPER_THRESHOLD"]},
+                        "{row["RESULT"]}",
+                        "{row["INSERT_TIMESTAMP"]}"
+                    )
+                """
+                    for row in results_with_it
+                ]
+            )
+            query_insert_values_into_result_table = f"""
+                INSERT INTO {self.result_table}
+                (DATE, METRIC_NAME, `TABLE`, SHOP_ID, `COLUMN`, VALUE, LOWER_THRESHOLD, UPPER_THRESHOLD, RESULT, INSERT_TIMESTAMP)
+                VALUES {values_clause}
+            """  # noqa: S608, E501
+            try:
+                execute_query(
+                    query_insert_values_into_result_table,
+                    self.duckdb_client,
+                    database_provider,
+                )
+            except duckdb.Error as e:
+                raise DatabaseError(f"Could not insert rows into table {self.result_table}") from e
 
-        log.info(f"{len(results_with_it)} entries were persisted to bq {self.result_table}")
+            log.info(
+                f"{len(results_with_it)} entries were persisted to "
+                f"{f'{self.config.database_accessor}.' if self.config.database_accessor else ''}{self.result_table}"
+            )
 
     def __call__(self):
         self.execute_checks()
-        log.info(
-            f"Ran {len(self.checks)} checks and used "
-            f"{round(self.bytes_billed / 2**30, 2)}GiB ({round(6 * self.bytes_billed / 2**40, 2)}€)."
-        )
+        log.info(f"Ran {len(self.checks)} checks")
 
         if self.check_failed:
             log.info(self.get_failed_checks_msg())
 
         if self.persist_results:
-            self.load_to_bq()
+            self.load_to_database()
 
         if self.log_path:
-            with open(self.log_path, "w", encoding="utf-8") as file:
-                file.write(self.get_failed_checks_msg())
+            failed_checks_msg = self.get_failed_checks_msg()
+            if not failed_checks_msg:
+                log.info("No failed checks, so no log file was written.")
+            else:
+                with open(self.log_path, "w", encoding="utf-8") as file:
+                    file.write(self.get_failed_checks_msg())
             log.info(f"DQM outputs were written to {self.log_path}")
 
         return self.result_dicts

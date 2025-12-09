@@ -2,16 +2,17 @@
 
 import abc
 import datetime as dt
+import math
 import re
-from typing import Any, Iterable, List, Literal, Optional, Tuple
+from typing import Any, Iterable, Literal, Optional
 
-import google.cloud.bigquery
-import numpy as np
-import pandas as pd
-from google.api_core.exceptions import BadRequest
-from google.cloud.bigquery import QueryJob
+import duckdb
 
-from src.koality.utils import format_dynamic, parse_date, to_set
+from koality.exceptions import KoalityError
+from koality.models import DatabaseProvider
+from koality.utils import execute_query, parse_date, to_set
+
+FLOAT_PRECISION = 4
 
 
 class DataQualityCheck(abc.ABC):
@@ -30,14 +31,18 @@ class DataQualityCheck(abc.ABC):
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
-        check_column: Optional[str] = None,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        check_column: str | None = None,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
+        extra_info: str | None = None,
         **kwargs,
     ):
+        self.database_accessor = database_accessor
+        self.database_provider = database_provider
         self.table = table
         self.lower_threshold = lower_threshold
         self.upper_threshold = upper_threshold
@@ -46,14 +51,14 @@ class DataQualityCheck(abc.ABC):
         self.date_info_string = f" ({kwargs['date_info']})" if "date_info" in kwargs else ""
 
         self.status = "NOT_EXECUTED"
-        self.message: Optional[str] = None
+        self.message: str | None = None
         self.bytes_billed: int = 0
 
         # for where filter handling
         self.filters = self.get_filters(kwargs)
 
         self.shop_id = self.filters.get("shop_id", {}).get("value", "ALL_SHOPS")
-        self.date = self.filters.get("date", {}).get("value", dt.date.today().isoformat())
+        self.date_filter_value = self.filters.get("date", {}).get("value", dt.date.today().isoformat())
 
         if check_column is None:
             self.check_column = "*"
@@ -85,7 +90,7 @@ class DataQualityCheck(abc.ABC):
 
         return self.shop_id + "_" + self.name
 
-    def data_check(self, bq_client: google.cloud.bigquery.Client) -> dict:
+    def data_check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
         """
         Performs a check if database tables used in the actual check
         contain data.
@@ -94,45 +99,55 @@ class DataQualityCheck(abc.ABC):
         aggregated in order to avoid duplicates in the reported failures.
 
         Args:
-            bq_client: BigQuery client for interacting with BigQuery
+            duckdb_client: DuckDB client for interacting with DuckDB
 
         Returns:
             If there is a table without data, a dict containing information about
             missing data will be returned, otherwise an empty dict indicating that
             data exists.
         """
-        query_job = bq_client.query(self.assemble_data_exists_query())
+        is_empty_table = False
         try:
-            result = [dict(result) for result in query_job.result()][0]
-        except BadRequest:
+            result = execute_query(
+                self.assemble_data_exists_query(),
+                duckdb_client,
+                self.database_provider,
+            ).fetchone()
+        except duckdb.Error:
             empty_table = f"Error while executing data check query on {self.table}"
         else:
-            self.bytes_billed += query_job.total_bytes_billed
-            empty_table = result["empty_table"]
+            empty_table = result[0] if result else self.table
+            is_empty_table = bool(empty_table)
 
-        if empty_table:
-            date = self.date if hasattr(self, "date") else pd.Timestamp("today").isoformat()
-            self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
-            self.status = "FAIL"
-            return {
-                "DATE": date,
-                "METRIC_NAME": "data_exists",
-                "SHOP_ID": self.shop_id,
-                "TABLE": empty_table,
-            }
-        return {}
+        if not is_empty_table:
+            return {}
 
-    def _check(self, bq_client: google.cloud.bigquery.Client, query: str) -> Tuple[QueryJob, List[dict], Optional[str]]:
-        query_job = bq_client.query(query)
-        query_result = []
+        date = self.date_filter_value if hasattr(self, "date_filter_value") else dt.datetime.today().isoformat()
+        self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
+        self.status = "FAIL"
+        return {
+            "DATE": date,
+            "METRIC_NAME": "data_exists",
+            "SHOP_ID": self.shop_id,
+            "TABLE": empty_table,
+        }
+
+    def _check(self, duckdb_client: duckdb.DuckDBPyConnection, query: str) -> tuple[list[dict], str | None]:
+        data = []
         error = None
         try:
-            query_result = [dict(result) for result in query_job.result()]
-        except BadRequest as exe:
-            error = str(exe)
-        return query_job, query_result, error
+            result = execute_query(
+                query,
+                duckdb_client,
+                self.database_provider,
+            )
+        except duckdb.Error as e:
+            error = str(e)
+        else:
+            data = [dict(zip(result.columns, row, strict=False)) for row in result.fetchall()]
+        return data, error
 
-    def check(self, bq_client: google.cloud.bigquery.Client) -> dict:
+    def check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
         """
         Method that is actually performing the check of a data quality check
         object. If the check is set to `monitor_only`, the results of the
@@ -140,29 +155,27 @@ class DataQualityCheck(abc.ABC):
         upper thresholds.
 
         Args:
-            bq_client: BigQuery client for interacting with BigQuery
+            duckdb_client: DuckDB client for interacting with DuckDB
 
         Returns:
             A dict containing all information and the result of the check
         """
 
-        query_job, query_result, error = self._check(bq_client, self.query)
+        result, error = self._check(duckdb_client, self.query)
 
-        check_value = query_result[0][self.name] if query_result else None
-        check_value = float(check_value) if check_value is not None else np.nan
-
+        check_value = result[0][self.name] if result else None
+        check_value = float(check_value) if check_value is not None else None
         if error:
             result = "ERROR"
             self.message = f"{self.shop_id}: Metric {self.name} query errored with {error}"
         else:
-            self.bytes_billed += query_job.total_bytes_billed
             if self.monitor_only:
                 result = "MONITOR_ONLY"
             else:
-                success = self.lower_threshold <= check_value <= self.upper_threshold
+                success = check_value is not None and self.lower_threshold <= check_value <= self.upper_threshold
                 result = "SUCCESS" if success else "FAIL"
 
-        date = self.date if hasattr(self, "date") else pd.Timestamp("today").isoformat()
+        date = self.date_filter_value
         result_dict = {
             "DATE": date,
             "METRIC_NAME": self.name,
@@ -176,28 +189,29 @@ class DataQualityCheck(abc.ABC):
         }
 
         if result_dict["RESULT"] == "FAIL":
+            value_string = f"{result_dict['VALUE']:.{FLOAT_PRECISION}f}" if result_dict["VALUE"] is not None else "NULL"
             self.message = (
-                f"{self.shop_id}: Metric {self.name} failed on {self.date}{self.date_info_string} for {self.table}."
-                f" Value {format_dynamic(value=result_dict['VALUE'], min_precision=4)} is not between"
-                f" {self.lower_threshold} and {self.upper_threshold}.{self.extra_info_string}"
+                f"{self.shop_id}: Metric {self.name} failed on {self.date_filter_value}{self.date_info_string} "
+                f"for {self.table}. Value {value_string} is not between {self.lower_threshold} and "
+                f"{self.upper_threshold}.{self.extra_info_string}"
             )
         self.status = result_dict["RESULT"]
         self.result = result_dict
 
         return result_dict
 
-    def __call__(self, bq_client):
-        data_check_result = self.data_check(bq_client)
+    def __call__(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
+        data_check_result = self.data_check(duckdb_client)
         if data_check_result:
             return data_check_result
 
-        return self.check(bq_client)
+        return self.check(duckdb_client)
 
     @staticmethod
     def get_filters(
         kwargs: dict,
         filter_col_suffix: str = r"_filter_column",
-        filter_value_suffix: str = "(_filter_value)?",
+        filter_value_suffix: str = "_filter_value",
     ):
         """
         Generates a filter dict from kwargs using a regex pattern.
@@ -248,7 +262,7 @@ class DataQualityCheck(abc.ABC):
             return ""
 
         filters_statements = [
-            4 * " " + f'{filter_dict["column"]} = "{filter_dict["value"]}"' for _, filter_dict in filters.items()
+            4 * " " + f"{filter_dict['column']} = '{filter_dict['value']}'" for _, filter_dict in filters.items()
         ]
 
         return "WHERE\n" + "\nAND\n".join(filters_statements)
@@ -271,11 +285,13 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         transformation_name: str,
         table: str,
         check_column: Optional[str] = None,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -283,6 +299,8 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         self.transformation_name = transformation_name
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             table=table,
             check_column=check_column,
             lower_threshold=lower_threshold,
@@ -339,28 +357,34 @@ class NullRatioCheck(ColumnTransformationCheck):
     Example:
 
     NullRatioCheck(
-        date="2023-01-01",  # optional
+        database_accessor="project.dataset",
+        database_provider=None,
         table="project.dataset.table",
-        shop_id="SHOP01",  # optional
         check_column="orders",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="date",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.9,
-        upper_threshold=1.0
+        upper_threshold=1.0,
     )
     """
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
+        extra_info: str | None = None,
         **kwargs,
     ):
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name="null_ratio",
             table=table,
             check_column=check_column,
@@ -372,7 +396,12 @@ class NullRatioCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
-        return f"SAFE_DIVIDE(COUNTIF({self.check_column} IS NULL), COUNT(*)) AS {self.name}"
+        return f"""
+            CASE
+                WHEN COUNT(*) = 0 THEN 0.0
+                ELSE ROUND(COUNTIF({self.check_column} IS NULL) / COUNT(*), 3)
+            END AS {self.name}
+        """
 
 
 class RegexMatchCheck(ColumnTransformationCheck):
@@ -389,23 +418,27 @@ class RegexMatchCheck(ColumnTransformationCheck):
     Example:
 
     RegexMatchCheck(
-        date="2023-01-01",  # optional
+        database_accessor="project.dataset",
+        database_provider=None,
         table="project.dataset.table",
-        check_column="^SHOP[0-9]{2}-.*"
         check_column="orders",
+        regex_to_match="^SHOP[0-9]{2}-.*",
         date_filter_column="date",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.9,
-        upper_threshold=1.0
+        upper_threshold=1.0,
     )
     """
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
         regex_to_match: str,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
@@ -413,6 +446,8 @@ class RegexMatchCheck(ColumnTransformationCheck):
         self.regex_to_match = regex_to_match
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name="regex_match_ratio",
             table=table,
             check_column=check_column,
@@ -424,7 +459,7 @@ class RegexMatchCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
-        return f"""AVG(IF(REGEXP_CONTAINS({self.check_column}, "{self.regex_to_match}"), 1, 0)) AS {self.name}"""
+        return f"""AVG(IF(REGEXP_MATCHES({self.check_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
 
 
 class ValuesInSetCheck(ColumnTransformationCheck):
@@ -444,24 +479,29 @@ class ValuesInSetCheck(ColumnTransformationCheck):
     Example:
 
     ValuesInSetCheck(
-        date="2023-01-01",  # optional
+        database_accessor="project.dataset",
+        database_provider=None,
         table="project.dataset.table",
-        shop_id="SHOP01",  # optional
         check_column="category",
         value_set='("toys", "shoes")',
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="date",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.9,
         upper_threshold=1.0,
+    )
     """
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
         value_set: str | bytes | Iterable,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         transformation_name: Optional[str] = None,
         extra_info: Optional[str] = None,
@@ -473,6 +513,8 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         self.value_set_string = f"({str(self.value_set)[1:-1]})"
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name=transformation_name if transformation_name else "values_in_set_ratio",
             table=table,
             check_column=check_column,
@@ -498,35 +540,42 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
     Example:
 
-    ValuesInSetCheck(
-        date="2023-01-01",  # mandatory
+    RollingValuesInSetCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.orders",
-        shop_id="SHOP01",  # optional
         check_column="category",
         value_set='("toys", "shoes")',
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # mandatory
+        date_filter_value="2023-01-01",  # mandatory
         lower_threshold=0.9,
         upper_threshold=1.0,
+    )
     """
 
     def __init__(
         self,
-        date: str,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
         value_set: str | bytes | Iterable,
-        date_filter_column: str = "BQ_PARTITIONTIME",
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        date_filter_column: str,
+        date_filter_value: str,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
-        self.date = date
         self.date_filter_column = date_filter_column
+        self.date_filter_value = date_filter_value
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name="rolling_values_in_set_ratio",
             table=table,
             value_set=value_set,
@@ -534,7 +583,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
             monitor_only=monitor_only,
-            date=date,
+            date_filter_value=date_filter_value,
             date_filter_column=date_filter_column,
             extra_info=extra_info,
             **kwargs,
@@ -549,7 +598,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
         main_query += (
             "WHERE\n    "
-            + f"{self.date_filter_column} BETWEEN TIMESTAMP_SUB('{self.date}', INTERVAL 14 DAY) AND '{self.date}'"
+            + f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"  # noqa: E501
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -567,12 +616,14 @@ class DuplicateCheck(ColumnTransformationCheck):
     Example:
 
     DuplicateCheck(
-        date="2023-01-01",  # optional
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0.0,
         upper_threshold=0.0,
     )
@@ -580,15 +631,19 @@ class DuplicateCheck(ColumnTransformationCheck):
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name="duplicates",
             table=table,
             check_column=check_column,
@@ -608,7 +663,7 @@ class CountCheck(ColumnTransformationCheck):
     Checks the number of rows or distinct values of a specific column. It inherits from
     `koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
     descriptions in its super class, except for the `distinct` argument which is added in
-    this sub class.
+    this subclass.
 
     Args:
         distinct: Indicates if the count should count all rows or only distinct values
@@ -618,13 +673,15 @@ class CountCheck(ColumnTransformationCheck):
     Example:
 
     CountCheck(
-        date="2023-01-01",  # optional
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         distinct=True,
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=10000.0,
         upper_threshold=99999.0,
     )
@@ -632,21 +689,25 @@ class CountCheck(ColumnTransformationCheck):
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
         distinct: bool = False,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
         if check_column == "*" and distinct:
-            raise ValueError("Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False.")
+            raise KoalityError("Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False.")
 
         self.distinct = distinct
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name="distinct_count" if distinct else "count",
             table=table,
             check_column=check_column,
@@ -670,29 +731,30 @@ class CountCheck(ColumnTransformationCheck):
         return super().assemble_name()
 
 
-class OccurenceCheck(ColumnTransformationCheck):
+class OccurrenceCheck(ColumnTransformationCheck):
     """
     Checks how often *any* value in a column occurs.
     It inherits from`koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
       descriptions in its super class.
-    Useful e.g. to check for a single product occuring unusually often (likely an error)
+    Useful e.g. to check for a single product occurring unusually often (likely an error)
 
     Args:
-        max_or_min: Check either the maximum or minimum occurence of any value.
+        max_or_min: Check either the maximum or minimum occurrence of any value.
                     If you want to check if any value occurs more than x times, use 'max' and upper_threshold=x
                     If you want to check if any value occurs less than y times, use 'min' and lower_threshold=y
 
     Example:
 
-    OccurenceCheck(
-        max_or_min="max,
-        date="2023-01-01",  # optional
+    OccurrenceCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
+        max_or_min="max",
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
-        distinct=True,
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
         lower_threshold=0,
         upper_threshold=500,
     )
@@ -700,13 +762,20 @@ class OccurenceCheck(ColumnTransformationCheck):
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         max_or_min: Literal["max", "min"],
         **kwargs,
     ):
         if max_or_min not in ("max", "min"):
             raise ValueError("'max_or_min' not one of supported modes 'min' or 'max'")
         self.max_or_min = max_or_min
-        super().__init__(transformation_name=f"occurence_{max_or_min}", **kwargs)
+        super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
+            transformation_name=f"occurrence_{max_or_min}",
+            **kwargs,
+        )
 
     def transformation_statement(self) -> str:
         return f"{self.check_column}, COUNT(*) AS {self.name}"
@@ -749,38 +818,42 @@ class MatchRateCheck(DataQualityCheck):
 
     Example:
 
-    check = match_rate_check(
-        date="2023-01-01",  # optional
+    MatchRateCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         left_table="my-gcp-project.SHOP01.pdp_views",
         right_table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         join_columns_left=["DATE", "product_number_v2"],
         join_columns_right=["DATE", "product_number"],
         check_column="product_number",
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # optional
+        date_filter_value="2023-01-01",  # optional
     )
     """
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         left_table: str,
         right_table: str,
         check_column: str,
-        join_columns: Optional[list[str]] = None,
-        join_columns_left: Optional[list[str]] = None,
-        join_columns_right: Optional[list[str]] = None,
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        join_columns: list[str] | None = None,
+        join_columns_left: list[str] | None = None,
+        join_columns_right: list[str] | None = None,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
+        extra_info: str | None = None,
         **kwargs,
     ):
         self.left_table = left_table
         self.right_table = right_table
 
         if not (join_columns or (join_columns_left and join_columns_right)):
-            raise ValueError(
+            raise KoalityError(
                 "No join_columns was provided. Use either join_columns or join_columns_left and join_columns_right"
             )
 
@@ -790,17 +863,19 @@ class MatchRateCheck(DataQualityCheck):
         self.join_columns_right: list[str] = join_columns_right if join_columns_right else join_columns or []
 
         if not self.join_columns_right or not self.join_columns_left:
-            raise ValueError(
+            raise KoalityError(
                 "No join_columns was provided. Use join_columns, join_columns_left, and/or join_columns_right"
             )
 
         if len(self.join_columns_left) != len(self.join_columns_right):
-            raise ValueError(
+            raise KoalityError(
                 "join_columns_left and join_columns_right need to have equal length"
                 f" ({len(self.join_columns_left)} vs. {len(self.join_columns_right)})."
             )
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             table=f"{self.left_table}_JOIN_{self.right_table}",
             check_column=check_column,
             lower_threshold=lower_threshold,
@@ -828,31 +903,33 @@ class MatchRateCheck(DataQualityCheck):
 
         return f"""
         WITH
-        righty AS (
-        SELECT DISTINCT
-            {right_column_statement},
-            TRUE AS in_right_table
-        FROM
-            `{self.right_table}`
-        {self.assemble_where_statement(self.filters_right)}
-        ),
+            righty AS (
+                SELECT DISTINCT
+                    {right_column_statement},
+                    TRUE AS in_right_table
+                FROM
+                    {f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}
+                {self.assemble_where_statement(self.filters_right)}
+            ),
+            lefty AS (
+                SELECT
+                    *
+                FROM
+                    {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
+                {self.assemble_where_statement(self.filters_left)}
+            )
 
-        lefty AS (
-        SELECT
-            *
-        FROM
-            `{self.left_table}`
-        {self.assemble_where_statement(self.filters_left)}
-        )
-
-        SELECT
-            ROUND(SAFE_DIVIDE(COUNTIF(in_right_table IS TRUE), COUNT(*)), 3) AS {self.name}
-        FROM
-            lefty
-        LEFT JOIN
-            righty
-        ON
-            {join_on_statement}
+            SELECT
+                CASE
+                    WHEN COUNT(*) = 0 THEN 0.0
+                    ELSE ROUND(COUNTIF(in_right_table IS TRUE) / COUNT(*), 3)
+                END AS {self.name}
+            FROM
+                lefty
+            LEFT JOIN
+                righty
+            ON
+                {join_on_statement}
         """
 
     def assemble_data_exists_query(self) -> str:
@@ -869,7 +946,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS right_counter,
             FROM
-                `{self.right_table}`
+                {f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}
             {self.assemble_where_statement(self.filters_right)}
         ),
 
@@ -877,7 +954,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS left_counter,
             FROM
-                `{self.left_table}`
+                {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
             {self.assemble_where_statement(self.filters_left)}
         )
 
@@ -910,14 +987,15 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
     Example:
 
     RelCountChangeCheck(
-        date="2023-01-01",  # mandatory
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
-        shop_id="SHOP01",  # optional
         check_column="sku_id",
         rolling_days=7,
-        distinct=True,
         shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
         date_filter_column="DATE",  # mandatory
+        date_filter_value="2023-01-01",  # mandatory
         lower_threshold=-0.15,
         upper_threshold=0.15,
     )
@@ -925,29 +1003,33 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
 
     def __init__(
         self,
-        date: str,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
         rolling_days: int,
-        date_filter_column: str = "BQ_PARTITIONTIME",
-        lower_threshold: float = -np.inf,
-        upper_threshold: float = np.inf,
+        date_filter_column: str,
+        date_filter_value: str,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: Optional[str] = None,
         **kwargs,
     ):
         self.rolling_days = rolling_days
-        self.date = date
+        self.date_filter_value = date_filter_value
         self.date_filter_column = date_filter_column
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             table=table,
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
             monitor_only=monitor_only,
-            date=date,
             date_filter_column=date_filter_column,
+            date_filter_value=date_filter_value,
             extra_info=extra_info,
             **kwargs,
         )
@@ -963,64 +1045,67 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         where_statement = self.assemble_where_statement(self.filters).replace("WHERE", "AND")
 
         return f"""
-        WITH base AS (
-        SELECT
-            {self.date_filter_column},
-            COUNT(DISTINCT {self.check_column}) AS dist_cnt
-        FROM
-            `{self.table}`
-        WHERE
-            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date}", INTERVAL {self.rolling_days} DAY)
-            AND "{self.date}"
-        {where_statement}
-        GROUP BY
-            {self.date_filter_column}
-        ),
+        WITH
+            base AS (
+                SELECT
+                    {self.date_filter_column},
+                    COUNT(DISTINCT {self.check_column}) AS dist_cnt
+                FROM
+                    {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
+                WHERE
+                    {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
+                    AND '{self.date_filter_value}'
+                {where_statement}
+                GROUP BY
+                    {self.date_filter_column}
+            ),
+            rolling_avgs AS (
+                SELECT
+                    AVG(dist_cnt) AS rolling_avg
+                FROM
+                    base
+                WHERE
+                    {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
+                AND
+                    (DATE '{self.date_filter_value}' - INTERVAL 1 DAY)
+            ),
 
-        rolling_avgs AS (
-        SELECT
-            AVG(dist_cnt) AS rolling_avg
-        FROM
-            base
-        WHERE
-            {self.date_filter_column} BETWEEN TIMESTAMP_SUB("{self.date}", INTERVAL {self.rolling_days} DAY)
-        AND
-            TIMESTAMP_SUB("{self.date}", INTERVAL 1 DAY)
-        ),
-
-        -- Helper is needed to cover case where no current data is available
-        dist_cnt_helper AS (
-          SELECT
-            MAX(dist_cnt) AS dist_cnt
-          FROM
-            (
-                SELECT dist_cnt FROM base WHERE {self.date_filter_column} = "{self.date}"
-                UNION ALL
-                SELECT 0 AS dist_cnt
+            -- Helper is needed to cover case where no current data is available
+            dist_cnt_helper AS (
+                SELECT
+                    MAX(dist_cnt) AS dist_cnt
+                FROM
+                    (
+                        SELECT dist_cnt FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
+                        UNION ALL
+                        SELECT 0 AS dist_cnt
+                    )
             )
-        )
 
-        SELECT
-            ROUND(SAFE_DIVIDE((dist_cnt - rolling_avg), rolling_avg), 3) AS {self.name}
-        FROM
-            dist_cnt_helper
-        JOIN
-            rolling_avgs
-        ON TRUE
-        """  # noqa: S608
+            SELECT
+                CASE
+                    WHEN rolling_avg = 0 THEN 0.0
+                    ELSE ROUND((dist_cnt - rolling_avg) / rolling_avg, 3)
+                END AS {self.name}
+            FROM
+                dist_cnt_helper
+            JOIN
+                rolling_avgs
+            ON TRUE
+        """  # noqa: S608, E501
 
     def assemble_data_exists_query(self) -> str:
         data_exists_query = f"""
         SELECT
             IF(COUNT(*) > 0, '', '{self.table}') AS empty_table
         FROM
-            {self.table}
+            {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
         """
 
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            return f"{data_exists_query}\n{where_statement} AND {self.date_filter_column} = '{self.date}'"
-        return f"{data_exists_query}\nWHERE {self.date_filter_column} = '{self.date}'"
+            return f"{data_exists_query}\n{where_statement} AND {self.date_filter_column} = '{self.date_filter_value}'"
+        return f"{data_exists_query}\nWHERE {self.date_filter_column} = '{self.date_filter_value}'"
 
 
 class IqrOutlierCheck(ColumnTransformationCheck):
@@ -1038,22 +1123,28 @@ class IqrOutlierCheck(ColumnTransformationCheck):
     Example:
 
     IqrOutlierCheck(
+        database_accessor="my-gcp-project.SHOP01",
+        database_provider=None,
         check_column="num_orders",
         table="my-gcp-project.SHOP01.orders",
-        date="2023-01-01",
-        date_filter_column="DATE",  # optional
+        date_filter_column="DATE",
+        date_filter_value="2023-01-01",
         interval_days=14,
         how="both",  # check both upper and lower outliers
         iqr_factor=1.5,
+        shop_id_filter_column="shop_code",  # optional
+        shop_id_filter_value="SHOP01",  # optional
     )
     """
 
     def __init__(
         self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
         check_column: str,
         table: str,
-        date: str,
         date_filter_column: str,
+        date_filter_value: str,
         interval_days: int,
         how: Literal["both", "upper", "lower"],
         iqr_factor: float,
@@ -1061,8 +1152,8 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         extra_info: Optional[str] = None,
         **kwargs,
     ):
-        self.date = date
         self.date_filter_column = date_filter_column
+        self.date_filter_value = date_filter_value
         if interval_days < 1:
             raise ValueError("interval_days must be at least 1")
         self.interval_days = int(interval_days)
@@ -1075,43 +1166,23 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         self.iqr_factor = float(iqr_factor)
 
         super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
             transformation_name=f"outlier_iqr_{self.how}_{str(self.iqr_factor).replace('.', '_')}",
             table=table,
             check_column=check_column,
-            lower_threshold=-np.inf,
-            upper_threshold=np.inf,
+            lower_threshold=-math.inf,
+            upper_threshold=math.inf,
             monitor_only=monitor_only,
             extra_info=extra_info,
-            date=date,
             date_filter_column=date_filter_column,
+            date_filter_value=date_filter_value,
             **kwargs,
         )
 
         self.filters = {
             filter_name: filer_dict for filter_name, filer_dict in self.filters.items() if filter_name != "date"
         }
-
-    # UDF for calculating exact percentiles in BigQuery
-    # https://medium.com/@rakeshmohandas/how-to-calculate-exact-quantiles-percentiles-in-bigquery-using-6465d69fc136
-    _percentile_udf = '''
-    CREATE TEMP FUNCTION
-    ExactPercentile(arr ARRAY<FLOAT64>,
-    percentile FLOAT64)
-    RETURNS FLOAT64
-    LANGUAGE js AS """
-    var sortedArray = arr.slice().sort(function(a, b) {
-    return a - b;
-    });
-    var index = (sortedArray.length - 1) * percentile;
-    var lower = Math.floor(index);
-    var upper = Math.ceil(index);
-    if (lower === upper) {
-    return sortedArray[lower];
-    }
-    var fraction = index - lower;
-    return sortedArray[lower] * (1 - fraction) + sortedArray[upper] * fraction;
-    """;
-    '''
 
     def transformation_statement(self) -> str:
         # TODO: currently we only raise an error if there is no data for the date
@@ -1125,52 +1196,44 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             where_statement = self.assemble_where_statement(self.filters)
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
         return f"""
-          DECLARE slice_count INT64;
-          SET slice_count = (SELECT COUNT(*) FROM {self.table} WHERE {self.date_filter_column} = "{self.date}");
-          IF slice_count = 0 THEN
-            RAISE USING MESSAGE = 'No data for {self.date} in {self.table}!';
-          END IF;
-
-          {self._percentile_udf}
-
-          WITH
-          raw AS (
-            SELECT
-                DATE({self.date_filter_column}) AS {self.date_filter_column},
-                {self.check_column}
-                {filter_columns}
-            FROM
-                {self.table}
-            WHERE
-                DATE({self.date_filter_column}) BETWEEN DATE_SUB("{self.date}", INTERVAL {self.interval_days} DAY)
-                AND "{self.date}"
-                {where_statement}
-          ),
-          compare AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} < "{self.date}"
-          ),
-          slice AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} = "{self.date}"
-          ),
-          percentiles AS (
-            SELECT
-              ExactPercentile(ARRAY_AGG(CAST({self.check_column} AS FLOAT64)), 0.25) AS q25,
-              ExactPercentile(ARRAY_AGG(CAST({self.check_column} AS FLOAT64)), 0.75) AS q75
-            FROM
-              compare
-          ),
-          stats AS (
-            SELECT
-              * except ({self.check_column}),
-              {self.check_column} AS {self.name},
-              (percentiles.q25 - {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS lower_threshold,
-              (percentiles.q75 + {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS upper_threshold,
-            FROM
-              slice
-            LEFT JOIN percentiles
-            ON TRUE
-          )
-        """  # noqa: S608
+        WITH
+            base AS (
+                SELECT
+                    DATE({self.date_filter_column}) AS {self.date_filter_column},
+                    {self.check_column}
+                    {filter_columns}
+                FROM
+                    {self.table}
+                WHERE
+                    DATE({self.date_filter_column}) BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.interval_days} DAY)
+                    AND DATE '{self.date_filter_value}'
+                    {where_statement}
+            ),
+            compare AS (
+                SELECT * FROM base WHERE {self.date_filter_column} < '{self.date_filter_value}'
+            ),
+            slice AS (
+                SELECT * FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
+            ),
+            percentiles AS (
+                SELECT
+                  QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.25) AS q25,
+                  QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.75) AS q75
+                FROM
+                  compare
+            ),
+            stats AS (
+                SELECT
+                  * exclude ({self.check_column}),
+                  {self.check_column} AS {self.name},
+                  (percentiles.q25 - {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS lower_threshold,
+                  (percentiles.q75 + {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS upper_threshold,
+                FROM
+                  slice
+                LEFT JOIN percentiles
+                ON TRUE
+            )
+        """  # noqa: S608, E501
 
     def query_boilerplate(self, metric_statement: str) -> str:
         return f"""
@@ -1182,26 +1245,26 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                 stats
         """
 
-    def _check(self, bq_client: google.cloud.bigquery.Client, query: str) -> Tuple[QueryJob, List[dict], Optional[str]]:
-        query_job, query_result, error = super()._check(bq_client, query)
+    def _check(self, duckdb_client: duckdb.DuckDBPyConnection, query: str) -> tuple[list[dict], str | None]:
+        result, error = super()._check(duckdb_client, query)
         # overwrite the lower and upper thresholds as required
-        if query_result:
+        if result:
             if self.how in ["both", "lower"]:
-                self.lower_threshold = query_result[0]["lower_threshold"]
+                self.lower_threshold = result[0]["lower_threshold"]
             if self.how in ["both", "upper"]:
-                self.upper_threshold = query_result[0]["upper_threshold"]
-        return query_job, query_result, error
+                self.upper_threshold = result[0]["upper_threshold"]
+        return result, error
 
     def assemble_data_exists_query(self) -> str:
         data_exists_query = f"""
         SELECT
             IF(COUNTIF({self.check_column} IS NOT NULL) > 0, '', '{self.table}') AS empty_table
         FROM
-            {self.table}
+            {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
         """
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            where_statement = f"{where_statement} AND {self.date_filter_column} = '{self.date}'"
+            where_statement = f"{where_statement} AND {self.date_filter_column} = '{self.date_filter_value}'"
         else:
-            where_statement = f"WHERE {self.date_filter_column} = '{self.date}'"
+            where_statement = f"WHERE {self.date_filter_column} = '{self.date_filter_value}'"
         return f"{data_exists_query}\n{where_statement}"

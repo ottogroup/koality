@@ -1,58 +1,72 @@
 """Utils for big expectations"""
 
+import datetime as dt
 import re
 from ast import literal_eval
 from collections.abc import Iterable
-from importlib import import_module
+from logging import getLogger
 from typing import Any, Union
 
-import numpy as np
-import pandas as pd
-from pandas._libs.missing import NAType
+import duckdb
+
+from koality.models import DatabaseProvider
+
+log = getLogger(__name__)
 
 
-def parse_gcs_path(path: str) -> tuple[str, str]:
-    """Parses a path of the form gs://mybucket/my/blob"""
-    if not path.startswith("gs://"):
-        raise ValueError("A GCS path needs to start with gs://")
+def identify_database_provider(
+    duckdb_client: duckdb.DuckDBPyConnection,
+    database_accessor: str,
+) -> DatabaseProvider:
+    # Check if the database accessor is of type bigquery
+    result = duckdb_client.query(f"SELECT * FROM duckdb_databases() WHERE database_name = '{database_accessor}'")  # noqa: S608
+    column_names = [desc[0] for desc in result.description]
+    first = result.fetchone()
+    if first is None:
+        raise KeyError(f"Database accessor '{database_accessor}' not found in duckdb databases.")
+    return DatabaseProvider(**dict(zip(column_names, first, strict=False)))
 
-    bucket_name = path[len("gs://") :].split("/")[0]
-    blob_name = path[len("gs://") + len(bucket_name) + 1 :]
 
-    if not blob_name:
-        raise ValueError("Blob name is empty")
-
-    return bucket_name, blob_name
-
-
-def resolve_dotted_name(dotted_name: str) -> object:
+def execute_query(
+    query: str,
+    duckdb_client: duckdb.DuckDBPyConnection,
+    database_provider: DatabaseProvider | None,
+) -> duckdb.DuckDBPyRelation:
     """
-    Resolves a dotted name, e.g., pointing to a class or function and
-    returns the corresponding object.
+    Execute a query, using bigquery_query() if the accessor is a BigQuery database.
 
-    Args:
-        dotted_name: A dotted path referring to a specific resource in a module.
+    This handles the limitation where BigQuery's Storage Read API cannot read views.
+    When a BigQuery accessor is detected, the query is wrapped in bigquery_query()
+    which uses the Jobs API instead.
 
-    Returns
-        An object (e.g., class) of a module.
-
+    Note: bigquery_query() only works for SELECT queries. Write operations
+    (INSERT, CREATE, UPDATE, DELETE) use standard DuckDB execution with the accessor prefix.
     """
-    if ":" in dotted_name:
-        module, name = dotted_name.split(":")
-    elif "." in dotted_name:
-        module, name = dotted_name.rsplit(".", 1)
-    else:
-        module, name = "koality.checks", dotted_name
+    if database_provider:
+        if database_provider.type == "bigquery":
+            # Check if this is a write operation
+            query_upper = query.strip().upper()
+            is_write_operation = query_upper.startswith(("INSERT", "CREATE", "UPDATE", "DELETE", "DROP", "ALTER"))
 
-    attr = import_module(module)
-    if name:
-        for n in name.split("."):
-            attr = getattr(attr, n)
+            # Need to escape single quotes in the query
+            escaped_query = query.replace("'", "\\'")
+            # path -> google cloud project
+            project = database_provider.path
 
-    return attr
+            if is_write_operation:
+                # Use bigquery_execute for write operations
+                wrapped_query = f"CALL bigquery_execute('{project}', '{escaped_query}')"  # noqa: S608
+            else:
+                # Use bigquery_query for read operations (supports views)
+                wrapped_query = f"SELECT * FROM bigquery_query('{project}', '{escaped_query}')"  # noqa: S608
+
+            return duckdb_client.query(wrapped_query)
+        log.info(f"Database is of type '{database_provider.type}'. Using standard query execution.")
+
+    return duckdb_client.query(query)
 
 
-def parse_date(date: Union[str, int], offset_days: int = 0) -> str:
+def parse_date(date: str, offset_days: int = 0) -> str:
     """
     Parses a date string which can be a relative terms like "today", "yesterday",
     or "tomorrow", actual dates, or relative dates like "today-2".
@@ -62,19 +76,23 @@ def parse_date(date: Union[str, int], offset_days: int = 0) -> str:
         offset_days: The number of days to be added/substracted.
     """
     date = str(date).lower()
+
+    if date == "today":
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
+
     if date == "yesterday":
         offset_days -= 1
-        return (pd.Timestamp("today") + pd.Timedelta(days=offset_days)).date().isoformat()
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
 
     if date == "tomorrow":
         offset_days += 1
-        return (pd.Timestamp("today") + pd.Timedelta(days=offset_days)).date().isoformat()
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
 
     if regex_match := re.search(r"today([+-][0-9]+)", date):
         offset_days += int(regex_match[1])
-        return (pd.Timestamp("today") + pd.Timedelta(days=offset_days)).date().isoformat()
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
 
-    return (pd.Timestamp(date) + pd.Timedelta(days=offset_days)).date().isoformat()
+    return (dt.datetime.fromisoformat(date) + dt.timedelta(days=offset_days)).date().isoformat()
 
 
 def parse_arg(arg: str) -> Union[str, int, bool]:
@@ -114,37 +132,3 @@ def to_set(value: Any) -> set:
     if isinstance(value, set):
         return value
     return set(value)
-
-
-def format_dynamic(value: Union[int, float, None, NAType], min_precision: int = 4) -> str:
-    """
-    Rounds a numeric value to min_precision decimals or more if needed in order to get
-    a non-zero result and returns it a string, e.g.:
-
-    - 0.1234      -> "0.1234"
-    - 0.00001     -> "0.00001"
-    - 0.000010123 -> "0.00001"
-    - 0.1         -> "0.1"
-
-    Args:
-        value: Number to be processed.
-        min_precision: Minimum number of decimals to be used.
-
-    Returns:
-        A rounded string representation of the value.
-    """
-    if pd.isna(value) or value is None:
-        value = np.nan
-
-    if value == 0:
-        return "0"
-
-    if min_precision < 1:
-        raise ValueError("min_precision must be >= 1")
-
-    prec = int(min_precision)
-
-    while (rounded_value := round(value, prec)) == 0:
-        prec += 1
-
-    return np.format_float_positional(rounded_value, trim="-")
