@@ -36,27 +36,38 @@ For comprehensive documentation, visit the [Koality Documentation](https://ottog
 ## Core Features
 
 - **Configurable Checks**: Define data quality checks via simple YAML configuration files
-- **DuckDB-Powered**: Fast, in-process analytics with support for external databases (BigQuery, Postgres, etc.)
+- **DuckDB-Powered**: Fast, in-process analytics with DuckDB's in-memory engine
+- **External Database Support**: Currently supports Google Cloud BigQuery via DuckDB extensions
 - **Multiple Check Types**: Null ratios, regex matching, value sets, duplicates, counts, match rates, outlier detection, and more
 - **Flexible Filtering**: Dynamic filtering system with column/value pairs for targeted checks
 - **Result Persistence**: Store check results in database tables for historical tracking
 - **CLI Tool**: Easy-to-use command-line interface for running checks
 - **Threshold Validation**: Compare check results against configurable lower/upper bounds
 
+## Supported Databases
+
+| Database              | Status            |
+|-----------------------|-------------------|
+| DuckDB (in-memory)    | ✅ Fully supported |
+| Google Cloud BigQuery | ✅ Fully supported |
+
+Koality uses DuckDB as its query engine. External databases are accessed through DuckDB extensions (e.g., the BigQuery extension for Google Cloud).
+External databases may need custom handling in [`execute_query`](src/koality/utils.py)!
+
 ## Available Checks
 
-| Check Type | Description |
-|------------|-------------|
-| `NullRatioCheck` | Share of NULL values in a column |
-| `RegexMatchCheck` | Share of values matching a regex pattern |
-| `ValuesInSetCheck` | Share of values matching a predefined set |
-| `RollingValuesInSetCheck` | Values in set over a rolling time window |
-| `DuplicateCheck` | Number of duplicate values in a column |
-| `CountCheck` | Row count or distinct value count |
-| `MatchRateCheck` | Match rate between two tables after joining |
-| `RelCountChangeCheck` | Relative count change vs. historical average |
-| `IqrOutlierCheck` | Detect outliers using interquartile range |
-| `OccurrenceCheck` | Check value occurrence frequency |
+| Check Type                | Description                                  |
+|---------------------------|----------------------------------------------|
+| `NullRatioCheck`          | Share of NULL values in a column             |
+| `RegexMatchCheck`         | Share of values matching a regex pattern     |
+| `ValuesInSetCheck`        | Share of values matching a predefined set    |
+| `RollingValuesInSetCheck` | Values in set over a rolling time window     |
+| `DuplicateCheck`          | Number of duplicate values in a column       |
+| `CountCheck`              | Row count or distinct value count            |
+| `MatchRateCheck`          | Match rate between two tables after joining  |
+| `RelCountChangeCheck`     | Relative count change vs. historical average |
+| `IqrOutlierCheck`         | Detect outliers using interquartile range    |
+| `OccurrenceCheck`         | Check value occurrence frequency             |
 
 ## Installation
 

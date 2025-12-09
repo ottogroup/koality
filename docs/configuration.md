@@ -2,6 +2,18 @@
 
 Koality uses YAML configuration files to define data quality checks. This page describes the configuration schema and available options.
 
+## Supported Databases
+
+Koality uses DuckDB as its query engine. Currently supported databases:
+
+| Database              | Status            |
+|-----------------------|-------------------|
+| DuckDB (in-memory)    | ✅ Fully supported |
+| Google Cloud BigQuery | ✅ Fully supported |
+
+External databases are accessed through DuckDB extensions. For BigQuery, queries are executed using the BigQuery Jobs API for read operations and `bigquery_execute` for write operations.
+Other databases may need custom handling in [`execute_query`](machinery/utils.md)!
+
 ## Configuration Schema
 
 ```yaml
@@ -28,6 +40,54 @@ check_bundles:                  # List of check bundles
       - check_type: string      # Type of check (required)
         # ... check-specific arguments
 ```
+
+## Database Connection
+
+The `database_setup` and `database_accessor` fields work together to configure how Koality connects to your data:
+
+### database_setup
+
+A SQL string that is executed when the `CheckExecutor` is initialized (if no custom DuckDB client is provided). Use this to:
+
+- Install and load DuckDB extensions
+- Attach external databases
+- Configure connection settings
+
+### database_accessor
+
+The name/alias of the attached database. This is used to:
+
+- Identify the database provider type (e.g., "bigquery")
+- Prefix table references in queries
+- Route queries through the appropriate execution method
+
+### Examples
+
+**DuckDB (in-memory with local file):**
+
+```yaml
+name: local_checks
+database_setup: |
+  ATTACH 'warehouse.duckdb' AS warehouse;
+database_accessor: warehouse
+```
+
+**Google Cloud BigQuery:**
+
+```yaml
+name: bigquery_checks
+database_setup: |
+  INSTALL bigquery;
+  LOAD bigquery;
+  ATTACH 'project=my-gcp-project' AS bq (TYPE bigquery, READ_ONLY);
+database_accessor: bq
+```
+
+When using BigQuery, Koality automatically:
+
+- Uses `bigquery_query()` for SELECT operations (supports views)
+- Uses `bigquery_execute()` for write operations (INSERT, CREATE, etc.)
+- Maps DuckDB types to BigQuery types (e.g., VARCHAR → STRING, NUMERIC → FLOAT64)
 
 ## Global Defaults
 

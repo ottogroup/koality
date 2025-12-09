@@ -16,6 +16,16 @@ pip install koality
 uv add koality
 ```
 
+## Supported Databases
+
+Koality uses DuckDB as its query engine. Currently supported:
+
+- **DuckDB (in-memory)** - Fully supported
+- **Google Cloud BigQuery** - Fully supported via DuckDB's BigQuery extension
+
+Other databases may work out of the box but may also be supported in future releases through extension of the 
+[`execute_query`](machinery/utils.md) function. Contributions are welcome!
+
 ## Basic Usage
 
 ### 1. Create a Configuration File
@@ -49,6 +59,24 @@ check_bundles:
         lower_threshold: 1000
         upper_threshold: 1000000
 ```
+
+#### Understanding database_setup and database_accessor
+
+- **`database_setup`**: SQL commands executed when the CheckExecutor initializes. Use this to install extensions, attach databases, and configure connections.
+- **`database_accessor`**: The alias/name of your attached database. Koality uses this to identify the database type and route queries appropriately.
+
+**Example for Google Cloud BigQuery:**
+
+```yaml
+name: bigquery_checks
+database_setup: |
+  INSTALL bigquery;
+  LOAD bigquery;
+  ATTACH 'project=my-gcp-project' AS bq (TYPE bigquery, READ_ONLY);
+database_accessor: bq
+```
+
+When using BigQuery, Koality automatically uses the BigQuery Jobs API for reads (which supports views) and `bigquery_execute()` for writes.
 
 ### 2. Run Checks Programmatically
 
