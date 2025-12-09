@@ -1,0 +1,45 @@
+site_name: Koality
+
+repo_url: https://github.com/ottogroup/koality
+repo_name: ottogroup/koality
+
+theme:
+  name: "material"
+  logo: assets/icon.png
+  favicon: assets/icon.png
+  language: en
+  custom_dir: docs/overrides
+  icon:
+    repo: fontawesome/brands/github
+  palette:
+    primary: white
+
+plugins:
+  - mkdocstrings:
+
+extra:
+  version:
+    provider: mike
+  social:
+    - icon: fontawesome/brands/linkedin
+      link: https://de.linkedin.com/company/otto-group-data-works
+      name: OG data.works on LinkedIn
+    - icon: fontawesome/brands/linkedin
+      link: https://de.linkedin.com/company/ottogroup-one-o
+      name: one.O on LinkedIn
+    - icon: fontawesome/brands/github
+      link: https://github.com/ottogroup
+      name: Otto Group on GitHub
+
+nav:
+  - Introduction: index.md
+  - Getting Started: getting-started.md
+  - Configuration: configuration.md
+  - Reference:
+    - Overview: machinery/index.md
+    - Checks: machinery/checks.md
+    - Executor: machinery/executor.md
+    - Models: machinery/models.md
+    - Utils: machinery/utils.md
+    - Exceptions: machinery/exceptions.md
+    - CLI: machinery/cli.md

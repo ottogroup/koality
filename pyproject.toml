@@ -70,6 +70,13 @@ dev = [
     "poethepoet>=0.37.0",
 ]
 
+docs = [
+    "mike>=1.1.2",
+    "mkdocs>=1.4.3",
+    "mkdocs-material>=9.1.15",
+    "mkdocstrings-python>=1.1.2",
+]
+
 [tool.ruff]
 line-length = 120
 
@@ -130,6 +137,8 @@ check_githubactions = "zizmor .github/workflows/"
 test_unit = "pytest -m unit"
 test_integration = "pytest -m integration"
 test = ["test_unit", "test_integration"]
+# Docs
+docs_serve = "mkdocs serve"
 
 [project.scripts]
 koality = "koality.cli:cli"
