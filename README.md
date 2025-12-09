@@ -1,153 +1,145 @@
-# koality
+<p align="center">
+  <img src="docs/assets/logo.png" alt="Koality Logo" width="400">
+</p>
 
-This repository contains koality - a library for checks on big query tables for data quality monitoring (DQM). It contains a number of generic data quality checks (e.g., null ratio checks, match rates) which can be used to check specific situations of different projects (i.e., actual tables and columns).
+<p align="center">
+  <strong>Data Quality Monitoring powered by DuckDB</strong>
+</p>
 
-The library provides the command-line tool *koality* which can be used - in combination with a koality configuration yaml - to perform checks and to log their results.
+<p align="center">
+  <a href="https://github.com/ottogroup/koality/actions/workflows/release.yml"><img src="https://github.com/ottogroup/koality/workflows/release/badge.svg" alt="Build Status"></a>
+  <a href="https://github.com/ottogroup/koality/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/ottogroup/koality/actions/workflows/pages/pages-build-deployment/badge.svg" alt="Pages Deployment"></a>
+  <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/v/koality.svg" alt="PyPI version"></a>
+  <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/pyversions/koality.svg" alt="Python versions"></a>
+  <a href="https://pepy.tech/project/koality"><img src="https://static.pepy.tech/personalized-badge/koality?period=month&units=international_system&left_color=grey&right_color=blue&left_text=PyPI%20downloads/month" alt="PyPI downloads"></a>
+  <a href="https://github.com/ottogroup/koality/blob/main/LICENSE.md"><img src="https://img.shields.io/github/license/ottogroup/koality" alt="License"></a>
+</p>
+
+---
+
+**Koality** is a Python library for data quality monitoring (DQM) using [DuckDB](https://duckdb.org/). It provides configurable checks that validate data in tables and can persist results to database tables for monitoring and alerting.
+
+We would like to thank [Norbert Maager](https://github.com/norbertmaager) who is the original inventor of Koality.
+
+**Warning**
+
+This library is a work in progress!
+
+Breaking changes should be expected until a 1.0 release, so version pinning is recommended.
+
+## Documentation
+
+For comprehensive documentation, visit the [Koality Documentation](https://ottogroup.github.io/koality/).
+
+## Core Features
+
+- **Configurable Checks**: Define data quality checks via simple YAML configuration files
+- **DuckDB-Powered**: Fast, in-process analytics with support for external databases (BigQuery, Postgres, etc.)
+- **Multiple Check Types**: Null ratios, regex matching, value sets, duplicates, counts, match rates, outlier detection, and more
+- **Flexible Filtering**: Dynamic filtering system with column/value pairs for targeted checks
+- **Result Persistence**: Store check results in database tables for historical tracking
+- **CLI Tool**: Easy-to-use command-line interface for running checks
+- **Threshold Validation**: Compare check results against configurable lower/upper bounds
+
+## Available Checks
+
+| Check Type | Description |
+|------------|-------------|
+| `NullRatioCheck` | Share of NULL values in a column |
+| `RegexMatchCheck` | Share of values matching a regex pattern |
+| `ValuesInSetCheck` | Share of values matching a predefined set |
+| `RollingValuesInSetCheck` | Values in set over a rolling time window |
+| `DuplicateCheck` | Number of duplicate values in a column |
+| `CountCheck` | Row count or distinct value count |
+| `MatchRateCheck` | Match rate between two tables after joining |
+| `RelCountChangeCheck` | Relative count change vs. historical average |
+| `IqrOutlierCheck` | Detect outliers using interquartile range |
+| `OccurrenceCheck` | Check value occurrence frequency |
 
 ## Installation
 
-### Using pyproject.toml
+```bash
+pip install koality
+```
+
+Or add to your `pyproject.toml`:
 
 ```toml
 [project]
-# ...
 dependencies = [
-    # ...
-    "koality>=x.y.z",
+    "koality>=0.1.0",
 ]
 ```
 
-## Using the CLI
+## Quick Start
 
-For running koality with a specific configuration, you need to provide the path to the config e.g.:
-
-```shell
-koality --config_path config/foo.yaml
-```
-
-It is also possible to overwrite some global defaults of a configuration (which are no explicit parameters of the CLI command). This can be handy if you want to test a configuration in a production setting without storing actual results in the production DQM monitoring table:
-
-```shell
-# Check prod without persisting results
-koality --config_path config/foo.yaml
-```
-
-## Configuration files
-
-Configuration files contain different structure levels where more specific sections overrule parameters of the more generic sections. The different structure levels are:
-
-- `global_defaults`: Values that should be used globally, e.g., if and where results should be persisted.
-- `check_bundles`: Checks that have something in common, e.g., the same check type on a specific column. A bundle consists of `default_args` and a list of checks.
-- `checks`: Most specific level, e.g., individual checks for different `shop_ids`. Each check can overrule parameters specified by its check bundle or by the global defaults.
-
-### Global parameters
-
-The global parameters specify the generic DQM handling:
-
-- `monitor_only`: If true, results are monitored only, i.e., it is not checked if results are within specified ranges.
-- `result_table`: BigQuery table where results are stored.
-- `persist_results`: Flag if results should be stored in BQ.
-- `log_path`: Path to file where failed checks are logged. Logs will be written to this path, independent of
-              `persist_results`. However, if `monitor_only` is active, no checks will be performed (and thus, no
-              failed checks will be logged).
-
-You can also specify additional global parameters to be used in all your checks as default, e.g., date filter or shop filter specifications.
-
-### Example configuration file
+### 1. Create a configuration file
 
 ```yaml
-# koality_example_config.yaml
-
-name: Dataquality Monitoring Example Config
+# koality_config.yaml
+name: My Data Quality Checks
 
 global_defaults:
   date_filter_column: date
-  shop_id_filter_column: shopId
-  monitor_only: False
-  result_table: project.dataset.koality
-  persist_results: True
-  log_path: message.txt
   date: yesterday
+  result_table: my_project.dqm.results
+  persist_results: true
+  log_path: dqm_failures.txt
 
 check_bundles:
-  - name: margin_null_ratio
+  - name: null_ratio_checks
     default_args:
       check_type: NullRatioCheck
-      table: project.dataset.table
-      check_column: bar
+      table: my_project.dataset.orders
       lower_threshold: 0
       upper_threshold: 0.05
-      date_info: "uses data of previous day"
     checks:
-      - shop_id: SHOP01
-        extra_info: "Note: No margin value for some brands."
-      - shop_id: SHOP02
+      - check_column: customer_id
+      - check_column: order_date
+      - check_column: total_amount
 ```
 
-In this example, the `global_defaults` specify generic DQM handling like if and where to persist results and where to log failed checks. It also provides global filter information for date and shop (i.e., if a check should be run for a specific day and a specific shop, and thus, data need to be filtered correspondingly).
+### 2. Run checks via CLI
 
-## Checks
-
-Checks execute a check query, usually on one or two tables, resulting in a check value (e.g., counts, null ratio or match rate). It is then checked if the result value is within specified bounds (lower/upper thresholds). If this is not the case, the check will fail and all failed checks will be logged.
-
-The following check types are supported:
-
-- `NullRatioCheck`: Checks the share of NULL values in a specific column of a table.
-- `RegexMatchCheck`: Checks the share of values matching a regex in a specific column of a table.
-- `ValuesInSetCheck`: Checks the share of values that match any value of a value set in a specific column of a table.
-- `RollingValuesInSetCheck`: Similar to `ValuesInSetCheck`, but the share is computed for a longer time period (currently also including data of the 14 days before the actual check date).
-- `DuplicateCheck`: Checks the number of duplicates for a specific column, i.e., all counts - distinct counts.
-- `CountCheck`: Checks the number of rows or distinct values of a specific column.
-- `MatchRateCheck`: Checks the match rate between two tables after joining on specific columns.
-- `RelCountChangeCheck`: Checks the relative change of a count in comparison to the average counts of a number of historic days before the check date.
-- `IqrOutlierCheck`: Checks if the date-specific value of a specific column is within the interquartile range (IQR) of values of previous x days.
-- `OccurenceCheck`: Checks if *any* value in a column occurs more / less often than specified thresholds.
-
-As shown in the example configuration above, it is also possible to provide some additional information about the date in the `date_info` argument or about the check in general in the `extra_info` argument. In case of failed checks, these texts will be added to the failure message.
-
-For further details take a look at the `checks` module.
-
-As the idea of this package is to provide a flexible and extensible tool for various situations, feel free to implement new checks as needed.
-
-### Filters
-
-koality contains a flexible filter logic which can be used to take into account only a subset of the data for a specific check. The most obvious filters are date and shop filters as in many cases predictions are performed for a specific day / shop combination.
-
-In order to specify such filters, you have to use the `_filter_column` postfix to corresponding parameters. Filter values have to be specified by another parameter with the same prefix (or with same prefix and `_filter_value` postfix), e.g.:
-
-```
-date_filter_column: date
-date: yesterday
-shop_id_filter_column: shopId
-shop_id: shopId
+```bash
+koality --config_path koality_config.yaml
 ```
 
-### Time magic
+### 3. Review results
 
-koality also supports some date strings and relative dates in configurations:
+Results are persisted to your configured result table and failures are logged to the specified log path.
 
-- `today`
-- `yesterday`
-- `tomorrow`
-- `today-2`
-- `today+3`
+## Configuration Hierarchy
 
-## Result tables
+Koality uses a hierarchical configuration system where more specific settings override general ones:
 
-The resulting table contains all relevant information of koality checks:
+1. **`global_defaults`**: Base settings for all checks (result table, persistence, filters)
+2. **`check_bundles.default_args`**: Bundle-level defaults (check type, table, thresholds)
+3. **`checks`**: Individual check configurations (specific columns, custom thresholds)
 
-| DATE       |  METRIC_NAME        | SHOP_ID | TABLE                 |  COLUMN        |  VALUE |  LOWER_THRESHOLD |  UPPER_THRESHOLD |  RESULT |
-|------------|---------------------|---------|-----------------------|----------------|--------|------------------|------------------|---------|
-| 2023-08-09 | category_null_ratio | SHOP01  | project.dataset.table | value.category |  0.065 |              0.0 |             0.06 | FAIL    |
-| 2023-08-09 | category_null_ratio | SHOP02  | project.dataset.table | value.category |  0.077 |              0.0 |             0.12 | SUCCESS |
-| 2023-08-09 | row_count           | SHOP03  | project.dataset.table | *              | 5226.0 |            100.0 |         Infinity | SUCCESS |
+## Filter System
 
-## Releasing a new version
+Apply dynamic filters to check specific data subsets:
 
-New versions of koality can be released via GitHub UI. Make sure that the version number in the `pyproject.toml` file is updated to the new version you want to release and that all changes are merged to the `main` branch. Then you can add a new release in the releases section of your repository. Once a new release tag is added, the `.github/workflows/release.yml` GitHub action workflow will be triggered and the new release will be deployed to the artifact registry.
+```yaml
+global_defaults:
+  date_filter_column: created_at
+  date: yesterday
+  shop_id_filter_column: shop_id
+  shop_id: SHOP01
+```
 
-## Patching
-- If you want to deploy new version, increase the version number in `pyproject.toml`
-- Update package version in [pyproject.toml](pyproject.toml)
-- Run `uv lock --upgrade`
-- Update github actions versions
+## Time Magic
+
+Koality supports relative date expressions:
+
+- `today`, `yesterday`, `tomorrow`
+- `today-2`, `today+3` (offset by days)
+
+## Contributing
+
+Contributions are welcome! Please feel free to submit issues and pull requests on [GitHub](https://github.com/ottogroup/koality).
+
+## License
+
+This project is licensed under the MIT License - see the [LICENSE.md](LICENSE.md) file for details.
