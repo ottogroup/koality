@@ -7,7 +7,7 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/ottogroup/koality/actions/workflows/release.yml"><img src="https://github.com/ottogroup/koality/workflows/release/badge.svg" alt="Build Status"></a>
+  <a href="https://github.com/ottogroup/koality/actions/workflows/release.yml"><img src="https://github.com/ottogroup/koality/actions/workflows/release.yml/badge.svg" alt="Build Status"></a>
   <a href="https://github.com/ottogroup/koality/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/ottogroup/koality/actions/workflows/pages/pages-build-deployment/badge.svg" alt="Pages Deployment"></a>
   <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/v/koality.svg" alt="PyPI version"></a>
   <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/pyversions/koality.svg" alt="Python versions"></a>
