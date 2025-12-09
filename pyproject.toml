@@ -2,8 +2,10 @@
 name = "koality"
 version = "0.1.0"
 authors = [
+    { name = "Team PiT @ Otto Group data.works GmbH" },
     { name = "Norbert Maager" },
-    { name = "Team PiT" }
+    { name = "Benjamin Gutzmann", email = "benjamin.gutzmann@pm.me" },
+    { name = "Michel Lentzler" }
 ]
 description = "Library for data checks and data quality monitoring based on duckdb."
 readme = "README.md"
