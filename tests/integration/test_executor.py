@@ -2,11 +2,10 @@ from pathlib import Path
 from textwrap import dedent
 
 import duckdb
+import pytest
 from pydantic_yaml import parse_yaml_raw_as
 
 from koality.executor import CheckExecutor
-import pytest
-
 from koality.models import Config
 
 
@@ -182,7 +181,7 @@ def test_executor_all_success(config_file_success, duckdb_client):
 
     assert result == expected
     assert not Path(config_file_success.parent, "message.txt").exists()
-    assert executor.check_failed == False
+    assert not executor.check_failed
 
 
 def test_executor_failure(config_file_failure_v2, duckdb_client):

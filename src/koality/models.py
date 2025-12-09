@@ -1,8 +1,7 @@
 from dataclasses import dataclass
 from typing import Literal, Self
-from pydantic import BaseModel, computed_field, model_validator, Field, conint, confloat
-from pydantic_yaml import parse_yaml_raw_as
-from dataclasses import dataclass
+
+from pydantic import BaseModel, Field, computed_field, confloat, conint, model_validator
 
 
 @dataclass
@@ -233,13 +232,3 @@ class Config(BaseModel):
 
         data["check_bundles"] = updated_bundles
         return data
-
-
-if __name__ == "__main__":
-    from pathlib import Path
-
-    here = Path(__file__).parent
-    config_path = here.parent.parent / "prank_dqm_sans_fgh.yaml"
-    config = parse_yaml_raw_as(Config, config_path.read_text())
-
-    print(config.check_bundles[0].checks[0])

@@ -1,12 +1,11 @@
 """Utils for big expectations"""
 
-from collections import defaultdict
-from logging import getLogger
+import datetime as dt
 import re
 from ast import literal_eval
 from collections.abc import Iterable
+from logging import getLogger
 from typing import Any, Union
-import datetime as dt
 
 import duckdb
 
@@ -20,18 +19,12 @@ def identify_database_provider(
     database_accessor: str,
 ) -> DatabaseProvider:
     # Check if the database accessor is of type bigquery
-    result = duckdb_client.query(
-        f"""
-        SELECT * 
-        FROM duckdb_databases() 
-        WHERE database_name = '{database_accessor}'
-        """
-    )
+    result = duckdb_client.query(f"SELECT * FROM duckdb_databases() WHERE database_name = '{database_accessor}'")  # noqa: S608
     column_names = [desc[0] for desc in result.description]
     first = result.fetchone()
     if first is None:
         raise KeyError(f"Database accessor '{database_accessor}' not found in duckdb databases.")
-    return DatabaseProvider(**dict(zip(column_names, first)))
+    return DatabaseProvider(**dict(zip(column_names, first, strict=False)))
 
 
 def execute_query(
@@ -62,14 +55,13 @@ def execute_query(
 
             if is_write_operation:
                 # Use bigquery_execute for write operations
-                wrapped_query = f"CALL bigquery_execute('{project}', '{escaped_query}')"
+                wrapped_query = f"CALL bigquery_execute('{project}', '{escaped_query}')"  # noqa: S608
             else:
                 # Use bigquery_query for read operations (supports views)
-                wrapped_query = f"SELECT * FROM bigquery_query('{project}', '{escaped_query}')"
+                wrapped_query = f"SELECT * FROM bigquery_query('{project}', '{escaped_query}')"  # noqa: S608
 
             return duckdb_client.query(wrapped_query)
-        else:
-            log.info(f"Database is of type '{database_provider.type}'. Using standard query execution.")
+        log.info(f"Database is of type '{database_provider.type}'. Using standard query execution.")
 
     return duckdb_client.query(query)
 
@@ -84,6 +76,10 @@ def parse_date(date: str, offset_days: int = 0) -> str:
         offset_days: The number of days to be added/substracted.
     """
     date = str(date).lower()
+
+    if date == "today":
+        return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()
+
     if date == "yesterday":
         offset_days -= 1
         return (dt.datetime.today() + dt.timedelta(days=offset_days)).date().isoformat()

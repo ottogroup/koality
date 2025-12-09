@@ -61,6 +61,7 @@ select = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/koality/checks.py" = ["S608"]
+"tests/*" = ["S101"]
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"

@@ -8,8 +8,9 @@ from typing import Any, Iterable, Literal, Optional
 
 import duckdb
 
+from koality.exceptions import KoalityError
 from koality.models import DatabaseProvider
-from koality.utils import parse_date, to_set, execute_query
+from koality.utils import execute_query, parse_date, to_set
 
 FLOAT_PRECISION = 4
 
@@ -143,7 +144,7 @@ class DataQualityCheck(abc.ABC):
         except duckdb.Error as e:
             error = str(e)
         else:
-            data = [{col: val for col, val in zip(result.columns, row)} for row in result.fetchall()]
+            data = [dict(zip(result.columns, row, strict=False)) for row in result.fetchall()]
         return data, error
 
     def check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
@@ -161,8 +162,6 @@ class DataQualityCheck(abc.ABC):
         """
 
         result, error = self._check(duckdb_client, self.query)
-
-        print(result, error)
 
         check_value = result[0][self.name] if result else None
         check_value = float(check_value) if check_value is not None else None
@@ -192,8 +191,9 @@ class DataQualityCheck(abc.ABC):
         if result_dict["RESULT"] == "FAIL":
             value_string = f"{result_dict['VALUE']:.{FLOAT_PRECISION}f}" if result_dict["VALUE"] is not None else "NULL"
             self.message = (
-                f"{self.shop_id}: Metric {self.name} failed on {self.date_filter_value}{self.date_info_string} for {self.table}."
-                f" Value {value_string} is not between {self.lower_threshold} and {self.upper_threshold}.{self.extra_info_string}"
+                f"{self.shop_id}: Metric {self.name} failed on {self.date_filter_value}{self.date_info_string} "
+                f"for {self.table}. Value {value_string} is not between {self.lower_threshold} and "
+                f"{self.upper_threshold}.{self.extra_info_string}"
             )
         self.status = result_dict["RESULT"]
         self.result = result_dict
@@ -329,7 +329,6 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         main_query = self.query_boilerplate(self.transformation_statement())
 
         if where_statement := self.assemble_where_statement(self.filters):
-            print(main_query + "\n" + where_statement)
             return main_query + "\n" + where_statement
 
         return main_query
@@ -396,7 +395,7 @@ class NullRatioCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         return f"""
-            CASE 
+            CASE
                 WHEN COUNT(*) = 0 THEN 0.0
                 ELSE ROUND(COUNTIF({self.check_column} IS NULL) / COUNT(*), 3)
             END AS {self.name}
@@ -484,7 +483,8 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         shop_id_filter_column="shop_code",  # optional
         date_filter_column="date",  # optional
         lower_threshold=0.9,
-        upper_threshold=1.0,
+        upper_threshold=1.0
+    )
     """
 
     def __init__(
@@ -589,7 +589,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
         main_query += (
             "WHERE\n    "
-            + f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"
+            + f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"  # noqa: E501
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -670,7 +670,7 @@ class CountCheck(ColumnTransformationCheck):
         shop_id_filter_column="shop_code",  # optional
         date_filter_column="DATE",  # optional
         lower_threshold=10000.0,
-        upper_threshold=99999.0,
+        upper_threshold=99999.0
     )
     """
 
@@ -688,7 +688,7 @@ class CountCheck(ColumnTransformationCheck):
         **kwargs,
     ):
         if check_column == "*" and distinct:
-            raise ValueError("Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False.")
+            raise KoalityError("Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False.")
 
         self.distinct = distinct
 
@@ -836,7 +836,7 @@ class MatchRateCheck(DataQualityCheck):
         self.right_table = right_table
 
         if not (join_columns or (join_columns_left and join_columns_right)):
-            raise ValueError(
+            raise KoalityError(
                 "No join_columns was provided. Use either join_columns or join_columns_left and join_columns_right"
             )
 
@@ -846,12 +846,12 @@ class MatchRateCheck(DataQualityCheck):
         self.join_columns_right: list[str] = join_columns_right if join_columns_right else join_columns or []
 
         if not self.join_columns_right or not self.join_columns_left:
-            raise ValueError(
+            raise KoalityError(
                 "No join_columns was provided. Use join_columns, join_columns_left, and/or join_columns_right"
             )
 
         if len(self.join_columns_left) != len(self.join_columns_right):
-            raise ValueError(
+            raise KoalityError(
                 "join_columns_left and join_columns_right need to have equal length"
                 f" ({len(self.join_columns_left)} vs. {len(self.join_columns_right)})."
             )
@@ -886,34 +886,33 @@ class MatchRateCheck(DataQualityCheck):
 
         return f"""
         WITH
-        righty AS (
-        SELECT DISTINCT
-            {right_column_statement},
-            TRUE AS in_right_table
-        FROM
-            {f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}
-        {self.assemble_where_statement(self.filters_right)}
-        ),
+            righty AS (
+                SELECT DISTINCT
+                    {right_column_statement},
+                    TRUE AS in_right_table
+                FROM
+                    {f"{self.database_accessor}." if self.database_accessor else ""}{self.right_table}
+                {self.assemble_where_statement(self.filters_right)}
+            ),
+            lefty AS (
+                SELECT
+                    *
+                FROM
+                    {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
+                {self.assemble_where_statement(self.filters_left)}
+            )
 
-        lefty AS (
-        SELECT
-            *
-        FROM
-            {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
-        {self.assemble_where_statement(self.filters_left)}
-        )
-
-        SELECT
-            CASE 
-                WHEN COUNT(*) = 0 THEN 0.0
-                ELSE ROUND(COUNTIF(in_right_table IS TRUE) / COUNT(*), 3)
-            END AS {self.name}
-        FROM
-            lefty
-        LEFT JOIN
-            righty
-        ON
-            {join_on_statement}
+            SELECT
+                CASE
+                    WHEN COUNT(*) = 0 THEN 0.0
+                    ELSE ROUND(COUNTIF(in_right_table IS TRUE) / COUNT(*), 3)
+                END AS {self.name}
+            FROM
+                lefty
+            LEFT JOIN
+                righty
+            ON
+                {join_on_statement}
         """
 
     def assemble_data_exists_query(self) -> str:
@@ -1027,54 +1026,54 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         where_statement = self.assemble_where_statement(self.filters).replace("WHERE", "AND")
 
         return f"""
-        WITH base AS (
-        SELECT
-            {self.date_filter_column},
-            COUNT(DISTINCT {self.check_column}) AS dist_cnt
-        FROM
-            {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
-        WHERE
-            {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
-            AND '{self.date_filter_value}'
-        {where_statement}
-        GROUP BY
-            {self.date_filter_column}
-        ),
+        WITH
+            base AS (
+                SELECT
+                    {self.date_filter_column},
+                    COUNT(DISTINCT {self.check_column}) AS dist_cnt
+                FROM
+                    {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
+                WHERE
+                    {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
+                    AND '{self.date_filter_value}'
+                {where_statement}
+                GROUP BY
+                    {self.date_filter_column}
+            ),
+            rolling_avgs AS (
+                SELECT
+                    AVG(dist_cnt) AS rolling_avg
+                FROM
+                    base
+                WHERE
+                    {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
+                AND
+                    (DATE '{self.date_filter_value}' - INTERVAL 1 DAY)
+            ),
 
-        rolling_avgs AS (
-        SELECT
-            AVG(dist_cnt) AS rolling_avg
-        FROM
-            base
-        WHERE
-            {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
-        AND
-            (DATE '{self.date_filter_value}' - INTERVAL 1 DAY)
-        ),
-
-        -- Helper is needed to cover case where no current data is available
-        dist_cnt_helper AS (
-          SELECT
-            MAX(dist_cnt) AS dist_cnt
-          FROM
-            (
-                SELECT dist_cnt FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
-                UNION ALL
-                SELECT 0 AS dist_cnt
+            -- Helper is needed to cover case where no current data is available
+            dist_cnt_helper AS (
+                SELECT
+                    MAX(dist_cnt) AS dist_cnt
+                FROM
+                    (
+                        SELECT dist_cnt FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
+                        UNION ALL
+                        SELECT 0 AS dist_cnt
+                    )
             )
-        )
 
-        SELECT
-            CASE 
-                WHEN rolling_avg = 0 THEN 0.0
-                ELSE ROUND((dist_cnt - rolling_avg) / rolling_avg, 3) 
-            END AS {self.name}
-        FROM
-            dist_cnt_helper
-        JOIN
-            rolling_avgs
-        ON TRUE
-        """  # noqa: S608
+            SELECT
+                CASE
+                    WHEN rolling_avg = 0 THEN 0.0
+                    ELSE ROUND((dist_cnt - rolling_avg) / rolling_avg, 3)
+                END AS {self.name}
+            FROM
+                dist_cnt_helper
+            JOIN
+                rolling_avgs
+            ON TRUE
+        """  # noqa: S608, E501
 
     def assemble_data_exists_query(self) -> str:
         data_exists_query = f"""
@@ -1174,44 +1173,44 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             where_statement = self.assemble_where_statement(self.filters)
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
         return f"""
-          WITH
-          raw AS (
-            SELECT
-                DATE({self.date_filter_column}) AS {self.date_filter_column},
-                {self.check_column}
-                {filter_columns}
-            FROM
-                {self.table}
-            WHERE
-                DATE({self.date_filter_column}) BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.interval_days} DAY)
-                AND DATE '{self.date_filter_value}'
-                {where_statement}
-          ),
-          compare AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} < '{self.date_filter_value}'
-          ),
-          slice AS (
-            SELECT * FROM raw WHERE {self.date_filter_column} = '{self.date_filter_value}'
-          ),
-          percentiles AS (
-            SELECT
-              QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.25) AS q25,
-              QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.75) AS q75
-            FROM
-              compare
-          ),
-          stats AS (
-            SELECT
-              * exclude ({self.check_column}),
-              {self.check_column} AS {self.name},
-              (percentiles.q25 - {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS lower_threshold,
-              (percentiles.q75 + {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS upper_threshold,
-            FROM
-              slice
-            LEFT JOIN percentiles
-            ON TRUE
-          )
-        """  # noqa: S608
+        WITH
+            base AS (
+                SELECT
+                    DATE({self.date_filter_column}) AS {self.date_filter_column},
+                    {self.check_column}
+                    {filter_columns}
+                FROM
+                    {self.table}
+                WHERE
+                    DATE({self.date_filter_column}) BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.interval_days} DAY)
+                    AND DATE '{self.date_filter_value}'
+                    {where_statement}
+            ),
+            compare AS (
+                SELECT * FROM base WHERE {self.date_filter_column} < '{self.date_filter_value}'
+            ),
+            slice AS (
+                SELECT * FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
+            ),
+            percentiles AS (
+                SELECT
+                  QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.25) AS q25,
+                  QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.75) AS q75
+                FROM
+                  compare
+            ),
+            stats AS (
+                SELECT
+                  * exclude ({self.check_column}),
+                  {self.check_column} AS {self.name},
+                  (percentiles.q25 - {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS lower_threshold,
+                  (percentiles.q75 + {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS upper_threshold,
+                FROM
+                  slice
+                LEFT JOIN percentiles
+                ON TRUE
+            )
+        """  # noqa: S608, E501
 
     def query_boilerplate(self, metric_statement: str) -> str:
         return f"""

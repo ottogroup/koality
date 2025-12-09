@@ -5,8 +5,8 @@ from pathlib import Path
 import click
 from pydantic_yaml import parse_yaml_raw_as
 
-from koality.models import Config
 from koality.executor import CheckExecutor
+from koality.models import Config
 from koality.utils import parse_arg
 
 

@@ -2,6 +2,8 @@ import datetime as dt
 
 import pytest
 
+from koality.utils import parse_arg, parse_date, to_set
+
 pytestmark = pytest.mark.unit
 
 
@@ -19,8 +21,6 @@ pytestmark = pytest.mark.unit
     ],
 )
 def test_parse_arg(test_input, expected):
-    from koality.utils import parse_arg
-
     assert expected == parse_arg(test_input)
 
 
@@ -42,8 +42,6 @@ def test_parse_arg(test_input, expected):
     ],
 )
 def test_parse_date(input_date, offset, expected):
-    from koality.utils import parse_date
-
     assert expected == parse_date(input_date, offset)
 
 
@@ -62,5 +60,5 @@ def test_parse_date(input_date, offset, expected):
         ({"toys"}, {"toys"}),
     ],
 )
-def test_to_set(to_set, test_input, expected):
+def test_to_set(test_input, expected):
     assert to_set(test_input) == expected

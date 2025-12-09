@@ -4,22 +4,24 @@ import datetime
 import logging
 from collections import defaultdict
 from typing import List
+
 import duckdb
 
 from koality.checks import (
-    DataQualityCheck,
-    NullRatioCheck,
-    RegexMatchCheck,
-    ValuesInSetCheck,
-    RollingValuesInSetCheck,
-    DuplicateCheck,
     CountCheck,
-    OccurrenceCheck,
-    MatchRateCheck,
-    RelCountChangeCheck,
+    DataQualityCheck,
+    DuplicateCheck,
     IqrOutlierCheck,
+    MatchRateCheck,
+    NullRatioCheck,
+    OccurrenceCheck,
+    RegexMatchCheck,
+    RelCountChangeCheck,
+    RollingValuesInSetCheck,
+    ValuesInSetCheck,
 )
-from koality.models import Config, CHECK_TYPE
+from koality.exceptions import DatabaseError
+from koality.models import CHECK_TYPE, Config
 from koality.utils import execute_query, identify_database_provider
 
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +41,7 @@ CHECK_MAP: dict[CHECK_TYPE, type[DataQualityCheck]] = {
 }
 
 # Mapping from DuckDB types to database-specific types
-# Structure: {duckdb_type: {database_type: target_type}}
+# Structure: {duckdb_type: {database_type: target_type}} # noqa: ERA001
 # Uses defaultdict so unknown database types fall back to the original duckdb_type
 DATA_TYPES: dict[str, dict[str, str]] = defaultdict(
     dict,
@@ -127,14 +129,10 @@ class CheckExecutor:
             database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
         for check_bundle in self.config.check_bundles:
             for check in check_bundle.checks:
-                # check_with_default_args = check_bundle.get("default_args", {}) | check
-                # log.info(", ".join(["{}: {}".format(k, v) for k, v in check_with_default_args.items()]))
-                # check_dict = check_suite_dict.get("global_defaults", {}) | check_with_default_args
                 check_factory = CHECK_MAP[check.check_type]
                 check_kwargs = check.model_dump(exclude={"check_type"}, exclude_unset=True)
                 check_kwargs["database_accessor"] = self.config.database_accessor
                 check_kwargs["database_provider"] = database_provider
-                print(check_kwargs)
                 check = check_factory(**check_kwargs)
                 self.checks.append(check)
 
@@ -284,15 +282,15 @@ class CheckExecutor:
             database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
             query_create_or_replace_table = f"""
                 CREATE TABLE IF NOT EXISTS {self.result_table} (
-                    DATE {DATA_TYPES["DATE"][database_provider.type]}, 
-                    METRIC_NAME {DATA_TYPES["VARCHAR"][database_provider.type]}, 
-                    TABLE {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    DATE {DATA_TYPES["DATE"][database_provider.type]},
+                    METRIC_NAME {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    TABLE {DATA_TYPES["VARCHAR"][database_provider.type]},
                     SHOP_ID {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    COLUMN {DATA_TYPES["VARCHAR"][database_provider.type]}, 
-                    VALUE {DATA_TYPES["VARCHAR"][database_provider.type]}, 
-                    LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]}, 
-                    UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]}, 
-                    RESULT {DATA_TYPES["VARCHAR"][database_provider.type]}, 
+                    COLUMN {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    VALUE {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
+                    UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
+                    RESULT {DATA_TYPES["VARCHAR"][database_provider.type]},
                     INSERT_TIMESTAMP {DATA_TYPES["TIMESTAMP"][database_provider.type]} DEFAULT CURRENT_TIMESTAMP
                 )
             """
@@ -303,25 +301,25 @@ class CheckExecutor:
                     self.duckdb_client,
                     database_provider,
                 )
-            except Exception as e:
-                raise ValueError(f"response {e} could not be inserted into table")
+            except duckdb.Error as e:
+                raise DatabaseError(f"Could not create or replace table {self.result_table}") from e
 
             # Convert results_with_it to VALUES clause
             values_clause = ", ".join(
                 [
                     f"""
                     (
-                        "{row["DATE"]}", 
-                        "{row["METRIC_NAME"]}", 
-                        "{row["TABLE"]}", 
-                        "{row["SHOP_ID"]}", 
-                        "{row["COLUMN"]}", 
-                        {row["VALUE"] if row["VALUE"] is not None else "NULL"}, 
+                        "{row["DATE"]}",
+                        "{row["METRIC_NAME"]}",
+                        "{row["TABLE"]}",
+                        "{row["SHOP_ID"]}",
+                        "{row["COLUMN"]}",
+                        {row["VALUE"] if row["VALUE"] is not None else "NULL"},
                         {row["LOWER_THRESHOLD"]},
-                        {row["UPPER_THRESHOLD"]}, 
-                        "{row["RESULT"]}", 
+                        {row["UPPER_THRESHOLD"]},
+                        "{row["RESULT"]}",
                         "{row["INSERT_TIMESTAMP"]}"
-                    ) 
+                    )
                 """
                     for row in results_with_it
                 ]
@@ -330,23 +328,24 @@ class CheckExecutor:
                 INSERT INTO {self.result_table}
                 (DATE, METRIC_NAME, `TABLE`, SHOP_ID, `COLUMN`, VALUE, LOWER_THRESHOLD, UPPER_THRESHOLD, RESULT, INSERT_TIMESTAMP)
                 VALUES {values_clause}
-            """
-            execute_query(
-                query_insert_values_into_result_table,
-                self.duckdb_client,
-                database_provider,
-            )
+            """  # noqa: S608, E501
+            try:
+                execute_query(
+                    query_insert_values_into_result_table,
+                    self.duckdb_client,
+                    database_provider,
+                )
+            except duckdb.Error as e:
+                raise DatabaseError(f"Could not insert rows into table {self.result_table}") from e
 
             log.info(
-                f"{len(results_with_it)} entries were persisted to {self.config.database_accessor}.{self.result_table}"
+                f"{len(results_with_it)} entries were persisted to "
+                f"{f'{self.config.database_accessor}.' if self.config.database_accessor else ''}{self.result_table}"
             )
 
     def __call__(self):
         self.execute_checks()
-        log.info(
-            f"Ran {len(self.checks)} checks and used "
-            # f"{round(self.bytes_billed / 2**30, 2)}GiB ({round(6 * self.bytes_billed / 2**40, 2)}€)."
-        )
+        log.info(f"Ran {len(self.checks)} checks")
 
         if self.check_failed:
             log.info(self.get_failed_checks_msg())

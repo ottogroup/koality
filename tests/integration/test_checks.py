@@ -1,6 +1,7 @@
 import duckdb
-from koality.checks import CountCheck, NullRatioCheck
 import pytest
+
+from koality.checks import CountCheck, NullRatioCheck
 
 pytestmark = pytest.mark.integration
 
