@@ -6,9 +6,13 @@ on:
     types:
       - published
 
+env:
+  OS: "ubuntu-latest"
+  PYTHON: "3.14"
+
 jobs:
   deploy:
-    runs-on: ubuntu-latest
+    runs-on: "ubuntu-latest"
     permissions:
       contents: write
       pages: write
@@ -19,12 +23,16 @@ jobs:
       - run: git fetch origin gh-pages:gh-pages
 
       - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON }}
 
       - name: Configure Git user
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
+
       - run: uv sync --only-group docs
+
       - run: uv run mike deploy v$(uvx --from=toml-cli toml get --toml-path=pyproject.toml project.version) latest --update-aliases --push
 
   release:
@@ -39,6 +47,8 @@ jobs:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON }}
 
       - name: Build
         run: uv build
