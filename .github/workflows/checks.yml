@@ -18,9 +18,13 @@ concurrency:
   cancel-in-progress: true
   group: ${{ github.workflow }}-${{ github.ref }}
 
+env:
+  OS: "ubuntu-latest"
+  PYTHON: "3.14"
+
 jobs:
   checks:
-    runs-on: ubuntu-latest
+    runs-on: "ubuntu-latest"
     strategy:
       matrix:
         check_command:
@@ -34,6 +38,8 @@ jobs:
           persist-credentials: false
 
       - uses: astral-sh/setup-uv@v7
+        with:
+          python-version: ${{ env.PYTHON }}
 
       - name: Install project
         run: uv sync
