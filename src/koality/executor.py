@@ -3,7 +3,6 @@
 import datetime
 import logging
 from collections import defaultdict
-from typing import List
 
 import duckdb
 
@@ -96,7 +95,7 @@ class CheckExecutor:
         self,
         config: Config,
         duckdb_client: duckdb.DuckDBPyConnection | None = None,
-        **kwargs,
+        **kwargs: object,
     ) -> None:
         self.config = config
         if duckdb_client is not None:
@@ -107,21 +106,21 @@ class CheckExecutor:
 
         self.kwargs = kwargs
 
-        self.checks: List = []
+        self.checks: list[DataQualityCheck] = []
         self.check_failed = False
 
-        self.jobs_: List = []
+        self.jobs_: list = []
 
-        self.result_dicts: List = []
+        self.result_dicts: list[dict] = []
         self.result_table = self.config.defaults.result_table
         self.persist_results = self.config.defaults.persist_results
         self.log_path = self.config.defaults.log_path
 
     @staticmethod
-    def aggregate_values(value_list) -> str:
+    def aggregate_values(value_list: list[str]) -> str:
         return ", ".join(sorted(set(value_list)))
 
-    def execute_checks(self):
+    def execute_checks(self) -> None:
         """
         Instantiates and executes all checks using a `ThreadPoolExecutor`. When walking
         through the different checks, parameters are updated using global defaults,
@@ -349,7 +348,7 @@ class CheckExecutor:
                 f"{f'{self.config.database_accessor}.' if self.config.database_accessor else ''}{self.result_table}"
             )
 
-    def __call__(self):
+    def __call__(self) -> list[dict]:
         self.execute_checks()
         log.info(f"Ran {len(self.checks)} checks")
 

@@ -111,6 +111,8 @@ select = [
     "F",
     # return
     "RET",
+    # flake8-annotations
+    "ANN"
 ]
 
 [tool.ruff.lint.per-file-ignores]

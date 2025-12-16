@@ -21,7 +21,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def duckdb_client():
+def duckdb_client() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with test data."""
     conn = duckdb.connect(":memory:")
 
@@ -58,7 +58,7 @@ def duckdb_client():
 
 
 @pytest.fixture
-def duckdb_client_iqr():
+def duckdb_client_iqr() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with IQR test data."""
     conn = duckdb.connect(":memory:")
 
@@ -94,7 +94,7 @@ def duckdb_client_iqr():
 
 
 @pytest.fixture
-def duckdb_client_iqr_two_shops():
+def duckdb_client_iqr_two_shops() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with IQR test data for two shops."""
     conn = duckdb.connect(":memory:")
 
@@ -145,7 +145,7 @@ def duckdb_client_iqr_two_shops():
 
 
 @pytest.fixture
-def duckdb_client_iqr_oven():
+def duckdb_client_iqr_oven() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with oven gate IQR test data."""
     conn = duckdb.connect(":memory:")
 
@@ -177,7 +177,7 @@ def duckdb_client_iqr_oven():
 
 
 @pytest.fixture
-def duckdb_client_iqr_latest_value_missing():
+def duckdb_client_iqr_latest_value_missing() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with IQR test data where latest value is NULL."""
     conn = duckdb.connect(":memory:")
 
@@ -210,7 +210,7 @@ def duckdb_client_iqr_latest_value_missing():
     return conn
 
 
-def test_null_ratio_check(duckdb_client):
+def test_null_ratio_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = NullRatioCheck(
         database_accessor="",
         database_provider=None,
@@ -226,7 +226,7 @@ def test_null_ratio_check(duckdb_client):
     assert result["VALUE"] == 0.25
 
 
-def test_null_ratio_check_empty_table(duckdb_client):
+def test_null_ratio_check_empty_table(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = NullRatioCheck(
         database_accessor="",
         database_provider=None,
@@ -245,7 +245,7 @@ def test_null_ratio_check_empty_table(duckdb_client):
     assert result["SHOP_ID"] == "SHOP001"
 
 
-def test_regex_match_check_all_matched(duckdb_client):
+def test_regex_match_check_all_matched(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = RegexMatchCheck(
         database_accessor="",
         database_provider=None,
@@ -262,7 +262,7 @@ def test_regex_match_check_all_matched(duckdb_client):
     assert result["VALUE"] == 1.0
 
 
-def test_regex_match_check_with_unmatched(duckdb_client):
+def test_regex_match_check_with_unmatched(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = RegexMatchCheck(
         database_accessor="",
         database_provider=None,
@@ -279,7 +279,7 @@ def test_regex_match_check_with_unmatched(duckdb_client):
     assert result["VALUE"] == 0.75
 
 
-def test_values_in_set_check_value_given(duckdb_client):
+def test_values_in_set_check_value_given(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Simple test case with 3/4 entries where values in value set are given."""
     check = ValuesInSetCheck(
         database_accessor="",
@@ -297,7 +297,7 @@ def test_values_in_set_check_value_given(duckdb_client):
     assert result["VALUE"] == 0.75
 
 
-def test_values_in_set_check_value_not_given(duckdb_client):
+def test_values_in_set_check_value_not_given(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test case with data for shop/day combination, but no occurrences of values in value set."""
     check = ValuesInSetCheck(
         database_accessor="",
@@ -324,7 +324,7 @@ def test_values_in_set_check_value_not_given(duckdb_client):
         ("2023-01-02", "SHOP999"),
     ],
 )
-def test_values_in_set_check_no_data(duckdb_client, day, shop):
+def test_values_in_set_check_no_data(duckdb_client: duckdb.DuckDBPyConnection, day: str, shop: str) -> None:
     """Test check if there is no data for the shop / day combination."""
     check = ValuesInSetCheck(
         database_accessor="",
@@ -344,7 +344,7 @@ def test_values_in_set_check_no_data(duckdb_client, day, shop):
     assert result["SHOP_ID"] == shop
 
 
-def test_values_in_set_check_value_single_value(duckdb_client):
+def test_values_in_set_check_value_single_value(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Simple test case with single value in set."""
     check = ValuesInSetCheck(
         database_accessor="",
@@ -362,7 +362,7 @@ def test_values_in_set_check_value_single_value(duckdb_client):
     assert result["VALUE"] == 0.5
 
 
-def test_rolling_values_in_set_check_value_given_single_day(duckdb_client):
+def test_rolling_values_in_set_check_value_given_single_day(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test case with 1 day data with 2/4 entries where values in value set are given."""
     check = RollingValuesInSetCheck(
         database_accessor="",
@@ -380,7 +380,7 @@ def test_rolling_values_in_set_check_value_given_single_day(duckdb_client):
     assert result["VALUE"] == 0.5
 
 
-def test_rolling_values_in_set_check_value_given_2_days(duckdb_client):
+def test_rolling_values_in_set_check_value_given_2_days(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test case with 2 days data with 6/8 entries where values in value set are given."""
     check = RollingValuesInSetCheck(
         database_accessor="",
@@ -398,7 +398,7 @@ def test_rolling_values_in_set_check_value_given_2_days(duckdb_client):
     assert result["VALUE"] == 0.75
 
 
-def test_duplicate_check_duplicates(duckdb_client):
+def test_duplicate_check_duplicates(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Simple duplicate check using assortment column for SHOP001
     which contains 3 distinct values, thus, 4 - 3 = 1 duplicates occur."""
     check = DuplicateCheck(
@@ -416,7 +416,7 @@ def test_duplicate_check_duplicates(duckdb_client):
     assert result["VALUE"] == 1
 
 
-def test_duplicate_check_no_duplicates(duckdb_client):
+def test_duplicate_check_no_duplicates(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Simple duplicate check using assortment column for SHOP023 where no duplicates occur."""
     check = DuplicateCheck(
         database_accessor="",
@@ -433,7 +433,7 @@ def test_duplicate_check_no_duplicates(duckdb_client):
     assert result["VALUE"] == 0
 
 
-def test_duplicate_check_no_data(duckdb_client):
+def test_duplicate_check_no_data(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Simple duplicate check using assortment column for a non-existing shop_id (SHOP999)."""
     check = DuplicateCheck(
         database_accessor="",
@@ -450,7 +450,7 @@ def test_duplicate_check_no_data(duckdb_client):
     assert result["DATE"] == "2023-01-01"
 
 
-def test_count_check_regular(duckdb_client):
+def test_count_check_regular(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test simple case of counting all rows."""
     check = CountCheck(
         database_accessor="",
@@ -467,7 +467,7 @@ def test_count_check_regular(duckdb_client):
     assert result["VALUE"] == 4
 
 
-def test_count_check_distinct_column(duckdb_client):
+def test_count_check_distinct_column(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test simple case of counting all distinct values of a column."""
     check = CountCheck(
         database_accessor="",
@@ -494,7 +494,7 @@ def test_count_check_distinct_column(duckdb_client):
         ("2023-01-02", "SHOP999"),
     ],
 )
-def test_count_check_regular_no_data(duckdb_client, day, shop):
+def test_count_check_regular_no_data(duckdb_client: duckdb.DuckDBPyConnection, day: str, shop: str) -> None:
     """Test check if there is no data for the shop / day combination."""
     check = CountCheck(
         database_accessor="",
@@ -512,7 +512,7 @@ def test_count_check_regular_no_data(duckdb_client, day, shop):
     assert result["SHOP_ID"] == shop
 
 
-def test_average_check(duckdb_client):
+def test_average_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = AverageCheck(
         database_accessor="",
         database_provider=None,
@@ -527,7 +527,7 @@ def test_average_check(duckdb_client):
     assert pytest.approx(result["VALUE"], 1e-6) == (5 + 3 + 0) / 3
 
 
-def test_max_check(duckdb_client):
+def test_max_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = MaxCheck(
         database_accessor="",
         database_provider=None,
@@ -542,7 +542,7 @@ def test_max_check(duckdb_client):
     assert result["VALUE"] == 5
 
 
-def test_min_check(duckdb_client):
+def test_min_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = MinCheck(
         database_accessor="",
         database_provider=None,
@@ -564,7 +564,13 @@ def test_min_check(duckdb_client):
         ("max", 0, 1, 2),  # max occurrence is 2 (SHOP001-0001 appears twice)
     ],
 )
-def test_occurrence_check(duckdb_client, max_or_min, lower_threshold, upper_threshold, expected_value):
+def test_occurrence_check(
+    duckdb_client: duckdb.DuckDBPyConnection,
+    max_or_min: str,
+    lower_threshold: int,
+    upper_threshold: int,
+    expected_value: int,
+) -> None:
     """Test whether any item occurs more / less often than specified."""
     check = OccurrenceCheck(
         database_accessor="",
@@ -581,7 +587,7 @@ def test_occurrence_check(duckdb_client, max_or_min, lower_threshold, upper_thre
     assert result["UPPER_THRESHOLD"] == upper_threshold
 
 
-def test_occurrence_check_faulty_mode():
+def test_occurrence_check_faulty_mode() -> None:
     """Test faulty mode for occurrence check."""
     with pytest.raises(ValueError) as exec_info:
         OccurrenceCheck(
@@ -594,7 +600,7 @@ def test_occurrence_check_faulty_mode():
     assert exec_info.match("supported modes 'min' or 'max'")
 
 
-def test_iqr_outlier_check_success(duckdb_client_iqr):
+def test_iqr_outlier_check_success(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -613,7 +619,7 @@ def test_iqr_outlier_check_success(duckdb_client_iqr):
     assert result["UPPER_THRESHOLD"] == 189.125
 
 
-def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops):
+def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops: duckdb.DuckDBPyConnection) -> None:
     # Test shop 'abcd'
     check = IqrOutlierCheck(
         database_accessor="",
@@ -653,7 +659,7 @@ def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops):
     assert result2["SHOP_ID"] == "efgh"
 
 
-def test_iqr_outlier_check_failure(duckdb_client_iqr):
+def test_iqr_outlier_check_failure(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -671,7 +677,7 @@ def test_iqr_outlier_check_failure(duckdb_client_iqr):
     assert result["RESULT"] == "FAIL"
 
 
-def test_iqr_outlier_check_success_because_only_lower(duckdb_client_iqr):
+def test_iqr_outlier_check_success_because_only_lower(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -697,7 +703,7 @@ def test_iqr_outlier_check_success_because_only_lower(duckdb_client_iqr):
         {"iqr_factor": 1.4},
     ],
 )
-def test_iqr_outlier_check_value_error(option):
+def test_iqr_outlier_check_value_error(option: dict[str, object]) -> None:
     kwargs = {
         "database_accessor": "",
         "database_provider": None,
@@ -713,7 +719,7 @@ def test_iqr_outlier_check_value_error(option):
         IqrOutlierCheck(**kwargs)
 
 
-def test_iqr_outlier_check_data_exists_error(duckdb_client_iqr_latest_value_missing):
+def test_iqr_outlier_check_data_exists_error(duckdb_client_iqr_latest_value_missing: duckdb.DuckDBPyConnection) -> None:
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -729,7 +735,7 @@ def test_iqr_outlier_check_data_exists_error(duckdb_client_iqr_latest_value_miss
     assert result["METRIC_NAME"] == "data_exists"
 
 
-def test_iqr_outlier_check_failure_oven_2024_02_12(duckdb_client_iqr_oven):
+def test_iqr_outlier_check_failure_oven_2024_02_12(duckdb_client_iqr_oven: duckdb.DuckDBPyConnection) -> None:
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -746,7 +752,7 @@ def test_iqr_outlier_check_failure_oven_2024_02_12(duckdb_client_iqr_oven):
     assert result["RESULT"] == "FAIL"
 
 
-def test_iqr_outlier_check_failure_oven_2024_02_13(duckdb_client_iqr_oven):
+def test_iqr_outlier_check_failure_oven_2024_02_13(duckdb_client_iqr_oven: duckdb.DuckDBPyConnection) -> None:
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,

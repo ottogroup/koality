@@ -12,6 +12,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - MaxCheck to compute MAX over a column.
 - MinCheck to compute MIN over a column.
 
+### Changed
+- Add missing type hints and migrate Optional/Union to modern union syntax
+
 ## [0.1.0] - 2025-12-09
 
 ### Added

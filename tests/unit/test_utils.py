@@ -20,7 +20,7 @@ pytestmark = pytest.mark.unit
         ("0.0", 0.0),
     ],
 )
-def test_parse_arg(test_input, expected):
+def test_parse_arg(test_input: str, expected: object) -> None:
     assert expected == parse_arg(test_input)
 
 
@@ -41,7 +41,7 @@ def test_parse_arg(test_input, expected):
         ("1990-10-03", 0, "1990-10-03"),
     ],
 )
-def test_parse_date(input_date, offset, expected):
+def test_parse_date(input_date: str, offset: int, expected: str) -> None:
     assert expected == parse_date(input_date, offset)
 
 
@@ -60,5 +60,5 @@ def test_parse_date(input_date, offset, expected):
         ({"toys"}, {"toys"}),
     ],
 )
-def test_to_set(test_input, expected):
+def test_to_set(test_input: object, expected: set[object]) -> None:
     assert to_set(test_input) == expected

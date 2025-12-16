@@ -10,7 +10,7 @@ from koality.models import Config
 
 
 @pytest.fixture
-def duckdb_client():
+def duckdb_client() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with test data."""
     conn = duckdb.connect(":memory:")
     # Create a test table with sample data
@@ -36,7 +36,7 @@ def duckdb_client():
 
 
 @pytest.fixture()
-def config_file_success(tmp_path):
+def config_file_success(tmp_path: Path) -> Path:
     content = dedent(
         f"""
         name: koality-all-success
@@ -78,7 +78,7 @@ def config_file_success(tmp_path):
 
 
 @pytest.fixture()
-def config_file_failure(tmp_path):
+def config_file_failure(tmp_path: Path) -> Path:
     content = dedent(
         f"""
         name: koality-failure
@@ -106,7 +106,7 @@ def config_file_failure(tmp_path):
 
 
 @pytest.fixture
-def config_file_failure_v2(tmp_path):
+def config_file_failure_v2(tmp_path: Path) -> Path:
     """Config with one successful and one failing check using real check types."""
     content = dedent(
         f"""
@@ -140,7 +140,7 @@ def config_file_failure_v2(tmp_path):
 
 
 @pytest.fixture()
-def config_file_missing_data_v2(tmp_path):
+def config_file_missing_data_v2(tmp_path: Path) -> Path:
     """Config that queries a non-existent table to trigger data_exists failure."""
     content = dedent(
         f"""
@@ -171,7 +171,7 @@ def config_file_missing_data_v2(tmp_path):
     return tmp_file
 
 
-def test_executor_all_success(config_file_success, duckdb_client):
+def test_executor_all_success(config_file_success: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
     config = parse_yaml_raw_as(Config, config_file_success.read_text())
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
     result_dict = executor()
@@ -184,7 +184,7 @@ def test_executor_all_success(config_file_success, duckdb_client):
     assert not executor.check_failed
 
 
-def test_executor_failure(config_file_failure_v2, duckdb_client):
+def test_executor_failure(config_file_failure_v2: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
     config = parse_yaml_raw_as(Config, config_file_failure_v2.read_text())
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
     result_dict = executor()
@@ -200,7 +200,7 @@ def test_executor_failure(config_file_failure_v2, duckdb_client):
     assert executor.check_failed is True
 
 
-def test_executor_missing_data(config_file_missing_data_v2, duckdb_client):
+def test_executor_missing_data(config_file_missing_data_v2: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
     # Create empty table
     duckdb_client.execute("""
         CREATE TABLE empty_table (
