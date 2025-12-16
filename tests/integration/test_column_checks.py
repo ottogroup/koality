@@ -4,9 +4,12 @@ import duckdb
 import pytest
 
 from koality.checks import (
+    AverageCheck,
     CountCheck,
     DuplicateCheck,
     IqrOutlierCheck,
+    MaxCheck,
+    MinCheck,
     NullRatioCheck,
     OccurrenceCheck,
     RegexMatchCheck,
@@ -507,6 +510,51 @@ def test_count_check_regular_no_data(duckdb_client, day, shop):
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == day
     assert result["SHOP_ID"] == shop
+
+
+def test_average_check(duckdb_client):
+    check = AverageCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="num_orders",
+        shop_id_filter_column="shop_code",
+        shop_id_filter_value="SHOP001",
+        date_filter_column="DATE",
+        date_filter_value="2023-01-01",
+    )
+    result = check(duckdb_client)
+    assert pytest.approx(result["VALUE"], 1e-6) == (5 + 3 + 0) / 3
+
+
+def test_max_check(duckdb_client):
+    check = MaxCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="num_orders",
+        shop_id_filter_column="shop_code",
+        shop_id_filter_value="SHOP001",
+        date_filter_column="DATE",
+        date_filter_value="2023-01-01",
+    )
+    result = check(duckdb_client)
+    assert result["VALUE"] == 5
+
+
+def test_min_check(duckdb_client):
+    check = MinCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="num_orders",
+        shop_id_filter_column="shop_code",
+        shop_id_filter_value="SHOP001",
+        date_filter_column="DATE",
+        date_filter_value="2023-01-01",
+    )
+    result = check(duckdb_client)
+    assert result["VALUE"] == 0
 
 
 @pytest.mark.parametrize(

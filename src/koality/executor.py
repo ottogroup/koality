@@ -8,11 +8,14 @@ from typing import List
 import duckdb
 
 from koality.checks import (
+    AverageCheck,
     CountCheck,
     DataQualityCheck,
     DuplicateCheck,
     IqrOutlierCheck,
     MatchRateCheck,
+    MaxCheck,
+    MinCheck,
     NullRatioCheck,
     OccurrenceCheck,
     RegexMatchCheck,
@@ -34,6 +37,9 @@ CHECK_MAP: dict[CHECK_TYPE, type[DataQualityCheck]] = {
     "RollingValuesInSetCheck": RollingValuesInSetCheck,
     "DuplicateCheck": DuplicateCheck,
     "CountCheck": CountCheck,
+    "AverageCheck": AverageCheck,
+    "MaxCheck": MaxCheck,
+    "MinCheck": MinCheck,
     "OccurrenceCheck": OccurrenceCheck,
     "MatchRateCheck": MatchRateCheck,
     "RelCountChangeCheck": RelCountChangeCheck,
