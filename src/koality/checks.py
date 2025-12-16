@@ -4,7 +4,7 @@ import abc
 import datetime as dt
 import math
 import re
-from typing import Any, Iterable, Literal, Optional
+from typing import Any, Iterable, Literal
 
 import duckdb
 
@@ -39,8 +39,8 @@ class DataQualityCheck(abc.ABC):
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: str | None = None,
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         self.database_accessor = database_accessor
         self.database_provider = database_provider
         self.table = table
@@ -66,10 +66,10 @@ class DataQualityCheck(abc.ABC):
             self.check_column = check_column
 
         self.name = self.assemble_name()
-        self.result: Optional[dict[str, Any]] = None
+        self.result: dict[str, Any] | None = None
 
     @property
-    def query(self):
+    def query(self) -> str:
         return self.assemble_query()
 
     @abc.abstractmethod
@@ -209,10 +209,10 @@ class DataQualityCheck(abc.ABC):
 
     @staticmethod
     def get_filters(
-        kwargs: dict,
+        kwargs: dict[str, Any],
         filter_col_suffix: str = r"_filter_column",
         filter_value_suffix: str = "_filter_value",
-    ):
+    ) -> dict[str, dict[str, Any]]:
         """
         Generates a filter dict from kwargs using a regex pattern.
         Returns a dict of the format
@@ -244,7 +244,7 @@ class DataQualityCheck(abc.ABC):
         return filters
 
     @staticmethod
-    def assemble_where_statement(filters: dict) -> str:
+    def assemble_where_statement(filters: dict[str, dict[str, Any]]) -> str:
         """
         Generates the where statement for the check query using the specified
         filters.
@@ -298,13 +298,13 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         database_provider: DatabaseProvider | None,
         transformation_name: str,
         table: str,
-        check_column: Optional[str] = None,
+        check_column: str | None = None,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         self.transformation_name = transformation_name
 
         super().__init__(
@@ -319,7 +319,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
             **kwargs,
         )
 
-    def assemble_name(self):
+    def assemble_name(self) -> str:
         return f"{self.check_column.split('.')[-1]}" + "_" + f"{self.transformation_name}"
 
     @abc.abstractmethod
@@ -389,8 +389,8 @@ class NullRatioCheck(ColumnTransformationCheck):
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: str | None = None,
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -449,9 +449,9 @@ class RegexMatchCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         self.regex_to_match = regex_to_match
 
         super().__init__(
@@ -512,10 +512,10 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        transformation_name: Optional[str] = None,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        transformation_name: str | None = None,
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         self.value_set = to_set(value_set)
         if not self.value_set:
             raise ValueError("'value_set' must not be empty")
@@ -576,9 +576,9 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         self.date_filter_column = date_filter_column
         self.date_filter_value = date_filter_value
 
@@ -647,9 +647,9 @@ class DuplicateCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -706,9 +706,9 @@ class CountCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         if check_column == "*" and distinct:
             raise KoalityError("Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False.")
 
@@ -733,7 +733,7 @@ class CountCheck(ColumnTransformationCheck):
 
         return f"COUNT({self.check_column}) AS {self.name}"
 
-    def assemble_name(self):
+    def assemble_name(self) -> str:
         if self.check_column == "*":
             return f"row_{self.transformation_name}"
 
@@ -756,9 +756,9 @@ class AverageCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -792,9 +792,9 @@ class MaxCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -828,9 +828,9 @@ class MinCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -882,8 +882,8 @@ class OccurrenceCheck(ColumnTransformationCheck):
         database_accessor: str,
         database_provider: DatabaseProvider | None,
         max_or_min: Literal["max", "min"],
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         if max_or_min not in ("max", "min"):
             raise ValueError("'max_or_min' not one of supported modes 'min' or 'max'")
         self.max_or_min = max_or_min
@@ -964,8 +964,8 @@ class MatchRateCheck(DataQualityCheck):
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
         extra_info: str | None = None,
-        **kwargs,
-    ):
+        **kwargs: object,
+    ) -> None:
         self.left_table = left_table
         self.right_table = right_table
 
@@ -1005,7 +1005,7 @@ class MatchRateCheck(DataQualityCheck):
         self.filters_left = self.filters | self.get_filters(kwargs, filter_col_suffix="filter_column_left")
         self.filters_right = self.filters | self.get_filters(kwargs, filter_col_suffix="filter_column_right")
 
-    def assemble_name(self):
+    def assemble_name(self) -> str:
         return f"{self.check_column.split('.')[-1]}_matchrate"
 
     def assemble_query(self) -> str:
@@ -1130,9 +1130,9 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         self.rolling_days = rolling_days
         self.date_filter_value = date_filter_value
         self.date_filter_column = date_filter_column
@@ -1155,7 +1155,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             filter_name: filer_dict for filter_name, filer_dict in self.filters.items() if filter_name != "date"
         }
 
-    def assemble_name(self):
+    def assemble_name(self) -> str:
         return f"{self.check_column.split('.')[-1]}" + "_count_change"
 
     def assemble_query(self) -> str:
@@ -1266,9 +1266,9 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         how: Literal["both", "upper", "lower"],
         iqr_factor: float,
         monitor_only: bool = False,
-        extra_info: Optional[str] = None,
-        **kwargs,
-    ):
+        extra_info: str | None = None,
+        **kwargs: object,
+    ) -> None:
         self.date_filter_column = date_filter_column
         self.date_filter_value = date_filter_value
         if interval_days < 1:

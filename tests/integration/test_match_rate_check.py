@@ -7,7 +7,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def duckdb_client():
+def duckdb_client() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with test data for match rate checks."""
     conn = duckdb.connect(":memory:")
 
@@ -64,7 +64,7 @@ def duckdb_client():
 
 
 @pytest.fixture
-def duckdb_client_renamed():
+def duckdb_client_renamed() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with renamed columns for testing different join column names."""
     conn = duckdb.connect(":memory:")
 
@@ -115,7 +115,7 @@ def duckdb_client_renamed():
     return conn
 
 
-def test_match_rate_check(duckdb_client):
+def test_match_rate_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """
     Simple check for match rate:
     - 4 / 5 product_numbers of purchases should be found
@@ -139,7 +139,7 @@ def test_match_rate_check(duckdb_client):
     assert result["VALUE"] == 0.8
 
 
-def test_match_rate_check_join_via_2(duckdb_client):
+def test_match_rate_check_join_via_2(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Tests if check also works if join is done via more than 1 column."""
     check = MatchRateCheck(
         database_accessor="",
@@ -158,7 +158,7 @@ def test_match_rate_check_join_via_2(duckdb_client):
     assert result["VALUE"] == 0.8
 
 
-def test_match_rate_check_different_join_col_names(duckdb_client_renamed):
+def test_match_rate_check_different_join_col_names(duckdb_client_renamed: duckdb.DuckDBPyConnection) -> None:
     """Tests if check also works if join is done via columns with different names."""
     check = MatchRateCheck(
         database_accessor="",
@@ -187,7 +187,7 @@ def test_match_rate_check_different_join_col_names(duckdb_client_renamed):
         ("2023-01-03", "SHOP999"),
     ],
 )
-def test_match_rate_check_no_data(duckdb_client, day, shop):
+def test_match_rate_check_no_data(duckdb_client: duckdb.DuckDBPyConnection, day: str, shop: str) -> None:
     """Test check if there is no data for the shop / day combination."""
     check = MatchRateCheck(
         database_accessor="",

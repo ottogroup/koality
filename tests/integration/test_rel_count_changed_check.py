@@ -7,7 +7,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def duckdb_client():
+def duckdb_client() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with test data for rel count change checks."""
     conn = duckdb.connect(":memory:")
 
@@ -70,7 +70,9 @@ def duckdb_client():
         ("2023-01-03", 0.0),  # (6 - 6) / 6
     ],
 )
-def test_rel_count_change_check_shop_filter(duckdb_client, day, change_rate):
+def test_rel_count_change_check_shop_filter(
+    duckdb_client: duckdb.DuckDBPyConnection, day: str, change_rate: float
+) -> None:
     """
     Test cases with shop restriction and different change rates
     for different days.
@@ -90,7 +92,7 @@ def test_rel_count_change_check_shop_filter(duckdb_client, day, change_rate):
     assert result["VALUE"] == change_rate
 
 
-def test_rel_count_change_check_no_history(duckdb_client):
+def test_rel_count_change_check_no_history(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test case with no history data available."""
     check = RelCountChangeCheck(
         database_accessor="",
@@ -108,7 +110,7 @@ def test_rel_count_change_check_no_history(duckdb_client):
     assert result["VALUE"] is None or result["METRIC_NAME"] == "data_exists"
 
 
-def test_rel_count_change_check_no_current_data(duckdb_client):
+def test_rel_count_change_check_no_current_data(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test case with no data for check day."""
     check = RelCountChangeCheck(
         database_accessor="",
@@ -126,7 +128,7 @@ def test_rel_count_change_check_no_current_data(duckdb_client):
     assert result["DATE"] == "2023-01-04"
 
 
-def test_rel_count_change_check_no_shop_filter(duckdb_client):
+def test_rel_count_change_check_no_shop_filter(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """
     Test cases without shop restriction, with history leading
     to a decreasing number of rows.

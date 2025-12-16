@@ -13,7 +13,7 @@ from koality.utils import parse_arg
 @click.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
 @click.option("--config_path", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.pass_context
-def cli(ctx, config_path: Path) -> None:
+def cli(ctx: click.Context, config_path: Path) -> None:
     """
     CLI for koality. Besides config_path and project_id, additional arguments
     can be provided that will overrule the global default configuration.

@@ -5,7 +5,6 @@ import re
 from ast import literal_eval
 from collections.abc import Iterable
 from logging import getLogger
-from typing import Any, Union
 
 import duckdb
 
@@ -95,7 +94,7 @@ def parse_date(date: str, offset_days: int = 0) -> str:
     return (dt.datetime.fromisoformat(date) + dt.timedelta(days=offset_days)).date().isoformat()
 
 
-def parse_arg(arg: str) -> Union[str, int, bool]:
+def parse_arg(arg: str) -> str | int | bool:
     if arg.lower() == "false":
         return False
     if arg.lower() == "true":
@@ -107,7 +106,7 @@ def parse_arg(arg: str) -> Union[str, int, bool]:
     return arg
 
 
-def to_set(value: Any) -> set:
+def to_set(value: object) -> set[object]:
     """
     Converts the input string to a set. The special case of one single string
     is also covered. Duplicates are also removed and for deterministic behavior,

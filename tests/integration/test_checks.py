@@ -7,7 +7,7 @@ pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
-def duckdb_client():
+def duckdb_client() -> duckdb.DuckDBPyConnection:
     """Create an in-memory DuckDB connection with test data."""
     conn = duckdb.connect(":memory:")
     # Create a test table with sample data
@@ -27,7 +27,7 @@ def duckdb_client():
     return conn
 
 
-def test_message_no_extra_info(duckdb_client):
+def test_message_no_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = CountCheck(
         database_accessor="",
         database_provider=None,
@@ -47,7 +47,7 @@ def test_message_no_extra_info(duckdb_client):
     )
 
 
-def test_message_date_info(duckdb_client):
+def test_message_date_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = CountCheck(
         database_accessor="",
         database_provider=None,
@@ -69,7 +69,7 @@ def test_message_date_info(duckdb_client):
     )
 
 
-def test_message_extra_info(duckdb_client):
+def test_message_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check = CountCheck(
         database_accessor="",
         database_provider=None,
@@ -91,7 +91,7 @@ def test_message_extra_info(duckdb_client):
     )
 
 
-def test_message_correct_formatting():
+def test_message_correct_formatting() -> None:
     """
     Test checks if output still returns a useful formatted value even if
     rounding by min_precision would lead to zero.
