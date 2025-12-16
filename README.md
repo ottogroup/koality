@@ -64,6 +64,9 @@ External databases may need custom handling in [`execute_query`](src/koality/uti
 | `RollingValuesInSetCheck` | Values in set over a rolling time window     |
 | `DuplicateCheck`          | Number of duplicate values in a column       |
 | `CountCheck`              | Row count or distinct value count            |
+| `AverageCheck`            | Average of a column                          |
+| `MaxCheck`                | Maximum of a column                          |
+| `MinCheck`                | Minimum of a column                          |
 | `MatchRateCheck`          | Match rate between two tables after joining  |
 | `RelCountChangeCheck`     | Relative count change vs. historical average |
 | `IqrOutlierCheck`         | Detect outliers using interquartile range    |

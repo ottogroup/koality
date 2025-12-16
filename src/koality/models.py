@@ -27,6 +27,9 @@ type CHECK_TYPE = Literal[
     "RollingValuesInSetCheck",
     "DuplicateCheck",
     "CountCheck",
+    "AverageCheck",
+    "MaxCheck",
+    "MinCheck",
     "OccurrenceCheck",
     "MatchRateCheck",
     "RelCountChangeCheck",
@@ -40,6 +43,9 @@ type CHECK = (
     | _RollingValuesInSetCheck
     | _DuplicateCheck
     | _CountCheck
+    | _AverageCheck
+    | _MaxCheck
+    | _MinCheck
     | _OccurrenceCheck
     | _MatchRateCheck
     | _RelCountChangeCheck
@@ -125,6 +131,24 @@ class _CountCheck(_SingleTableCheck):
 
     check_type: Literal["CountCheck"]
     distinct: bool = False
+
+
+class _AverageCheck(_SingleTableCheck):
+    """Config model for AverageCheck."""
+
+    check_type: Literal["AverageCheck"]
+
+
+class _MaxCheck(_SingleTableCheck):
+    """Config model for MaxCheck."""
+
+    check_type: Literal["MaxCheck"]
+
+
+class _MinCheck(_SingleTableCheck):
+    """Config model for MinCheck."""
+
+    check_type: Literal["MinCheck"]
 
 
 class _OccurrenceCheck(_SingleTableCheck):

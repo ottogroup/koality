@@ -740,6 +740,114 @@ class CountCheck(ColumnTransformationCheck):
         return super().assemble_name()
 
 
+class AverageCheck(ColumnTransformationCheck):
+    """
+    Computes the average (AVG) of a numeric column for the filtered rows.
+
+    Inherits from ColumnTransformationCheck. Thresholds apply to the computed average.
+    """
+
+    def __init__(
+        self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
+        table: str,
+        check_column: str,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
+        monitor_only: bool = False,
+        extra_info: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
+            transformation_name="avg",
+            table=table,
+            check_column=check_column,
+            lower_threshold=lower_threshold,
+            upper_threshold=upper_threshold,
+            monitor_only=monitor_only,
+            extra_info=extra_info,
+            **kwargs,
+        )
+
+    def transformation_statement(self) -> str:
+        return f"AVG({self.check_column}) AS {self.name}"
+
+
+class MaxCheck(ColumnTransformationCheck):
+    """
+    Computes the maximum (MAX) of a column for the filtered rows.
+
+    Inherits from ColumnTransformationCheck. Thresholds apply to the computed maximum.
+    """
+
+    def __init__(
+        self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
+        table: str,
+        check_column: str,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
+        monitor_only: bool = False,
+        extra_info: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
+            transformation_name="max",
+            table=table,
+            check_column=check_column,
+            lower_threshold=lower_threshold,
+            upper_threshold=upper_threshold,
+            monitor_only=monitor_only,
+            extra_info=extra_info,
+            **kwargs,
+        )
+
+    def transformation_statement(self) -> str:
+        return f"MAX({self.check_column}) AS {self.name}"
+
+
+class MinCheck(ColumnTransformationCheck):
+    """
+    Computes the minimum (MIN) of a column for the filtered rows.
+
+    Inherits from ColumnTransformationCheck. Thresholds apply to the computed minimum.
+    """
+
+    def __init__(
+        self,
+        database_accessor: str,
+        database_provider: DatabaseProvider | None,
+        table: str,
+        check_column: str,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
+        monitor_only: bool = False,
+        extra_info: Optional[str] = None,
+        **kwargs,
+    ):
+        super().__init__(
+            database_accessor=database_accessor,
+            database_provider=database_provider,
+            transformation_name="min",
+            table=table,
+            check_column=check_column,
+            lower_threshold=lower_threshold,
+            upper_threshold=upper_threshold,
+            monitor_only=monitor_only,
+            extra_info=extra_info,
+            **kwargs,
+        )
+
+    def transformation_statement(self) -> str:
+        return f"MIN({self.check_column}) AS {self.name}"
+
+
 class OccurrenceCheck(ColumnTransformationCheck):
     """
     Checks how often *any* value in a column occurs.
