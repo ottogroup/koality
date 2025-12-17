@@ -10,6 +10,7 @@
   <a href="https://github.com/ottogroup/koality/actions/workflows/tests.yml"><img src="https://github.com/ottogroup/koality/actions/workflows/tests.yml/badge.svg" alt="Tests"></a>
   <a href="https://github.com/ottogroup/koality/actions/workflows/release.yml"><img src="https://github.com/ottogroup/koality/actions/workflows/release.yml/badge.svg" alt="Release"></a>
   <a href="https://github.com/ottogroup/koality/actions/workflows/pages/pages-build-deployment"><img src="https://github.com/ottogroup/koality/actions/workflows/pages/pages-build-deployment/badge.svg" alt="Pages Deployment"></a>
+  <a href="https://codecov.io/gh/ottogroup/koality"><img src="https://codecov.io/gh/ottogroup/koality/branch/main/graph/badge.svg" alt="Codecov"></a>
   <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/v/koality.svg" alt="PyPI version"></a>
   <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/status/koality.svg" alt="PyPI status"></a>
   <a href="https://pypi.org/project/koality/"><img src="https://img.shields.io/pypi/pyversions/koality.svg" alt="Python versions"></a>
