@@ -4,7 +4,8 @@ import abc
 import datetime as dt
 import math
 import re
-from typing import Any, Iterable, Literal
+from collections.abc import Iterable
+from typing import Any, Literal
 
 import duckdb
 
@@ -16,9 +17,9 @@ FLOAT_PRECISION = 4
 
 
 class DataQualityCheck(abc.ABC):
-    """
-    Abstract class for all data quality checks. It provides generic methods
-    relevant to all data quality check classes.
+    """Abstract class for all data quality checks.
+
+    Provides generic methods relevant to all data quality check classes.
 
     Args:
         table: Name of BQ table (e.g., "project.dataset.table")
@@ -27,6 +28,7 @@ class DataQualityCheck(abc.ABC):
         upper_threshold: Check will fail if check result > upper_threshold
         monitor_only: If True, no checks will be performed
         extra_info: Optional additional text that will be added to the end of the failure message
+
     """
 
     def __init__(
@@ -37,10 +39,12 @@ class DataQualityCheck(abc.ABC):
         check_column: str | None = None,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the data quality check with configuration parameters."""
         self.database_accessor = database_accessor
         self.database_provider = database_provider
         self.table = table
@@ -58,7 +62,10 @@ class DataQualityCheck(abc.ABC):
         self.filters = self.get_filters(kwargs)
 
         self.shop_id = self.filters.get("shop_id", {}).get("value", "ALL_SHOPS")
-        self.date_filter_value = self.filters.get("date", {}).get("value", dt.date.today().isoformat())
+        self.date_filter_value = self.filters.get("date", {}).get(
+            "value",
+            dt.datetime.now(tz=dt.UTC).date().isoformat(),
+        )
 
         if check_column is None:
             self.check_column = "*"
@@ -70,30 +77,30 @@ class DataQualityCheck(abc.ABC):
 
     @property
     def query(self) -> str:
+        """Return the assembled SQL query for this check."""
         return self.assemble_query()
 
     @abc.abstractmethod
     def assemble_query(self) -> str:
-        pass
+        """Assemble and return the SQL query for this check."""
 
     @abc.abstractmethod
     def assemble_data_exists_query(self) -> str:
-        pass
+        """Assemble and return the SQL query to check if data exists."""
 
     @abc.abstractmethod
     def assemble_name(self) -> str:
-        pass
+        """Assemble and return the name for this check."""
 
     def __repr__(self) -> str:
+        """Return string representation combining shop_id and check name."""
         if not hasattr(self, "shop_id"):
             return self.name
 
-        return self.shop_id + "_" + self.name
+        return f"{self.shop_id}_{self.name}"
 
     def data_check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
-        """
-        Performs a check if database tables used in the actual check
-        contain data.
+        """Check if database tables used in the actual check contain data.
 
         Note: The returned result dict and failure message will be later
         aggregated in order to avoid duplicates in the reported failures.
@@ -105,6 +112,7 @@ class DataQualityCheck(abc.ABC):
             If there is a table without data, a dict containing information about
             missing data will be returned, otherwise an empty dict indicating that
             data exists.
+
         """
         is_empty_table = False
         try:
@@ -122,7 +130,7 @@ class DataQualityCheck(abc.ABC):
         if not is_empty_table:
             return {}
 
-        date = self.date_filter_value if hasattr(self, "date_filter_value") else dt.datetime.today().isoformat()
+        date = self.date_filter_value if hasattr(self, "date_filter_value") else dt.datetime.now(tz=dt.UTC).isoformat()
         self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
         self.status = "FAIL"
         return {
@@ -148,9 +156,9 @@ class DataQualityCheck(abc.ABC):
         return data, error
 
     def check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
-        """
-        Method that is actually performing the check of a data quality check
-        object. If the check is set to `monitor_only`, the results of the
+        """Perform the data quality check and return results.
+
+        If the check is set to `monitor_only`, the results of the
         check will be documented without comparison to the lower and
         upper thresholds.
 
@@ -159,8 +167,8 @@ class DataQualityCheck(abc.ABC):
 
         Returns:
             A dict containing all information and the result of the check
-        """
 
+        """
         result, error = self._check(duckdb_client, self.query)
 
         check_value = result[0][self.name] if result else None
@@ -168,12 +176,11 @@ class DataQualityCheck(abc.ABC):
         if error:
             result = "ERROR"
             self.message = f"{self.shop_id}: Metric {self.name} query errored with {error}"
+        elif self.monitor_only:
+            result = "MONITOR_ONLY"
         else:
-            if self.monitor_only:
-                result = "MONITOR_ONLY"
-            else:
-                success = check_value is not None and self.lower_threshold <= check_value <= self.upper_threshold
-                result = "SUCCESS" if success else "FAIL"
+            success = check_value is not None and self.lower_threshold <= check_value <= self.upper_threshold
+            result = "SUCCESS" if success else "FAIL"
 
         date = self.date_filter_value
         result_dict = {
@@ -201,6 +208,7 @@ class DataQualityCheck(abc.ABC):
         return result_dict
 
     def __call__(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
+        """Execute the data quality check and return results."""
         data_check_result = self.data_check(duckdb_client)
         if data_check_result:
             return data_check_result
@@ -213,12 +221,11 @@ class DataQualityCheck(abc.ABC):
         filter_col_suffix: str = r"_filter_column",
         filter_value_suffix: str = "_filter_value",
     ) -> dict[str, dict[str, Any]]:
-        """
-        Generates a filter dict from kwargs using a regex pattern.
+        """Generate a filter dict from kwargs using a regex pattern.
+
         Returns a dict of the format
             {"date": {"column": "date", "value": "2020-01-01"}, ...}
         """
-
         filters = {}
 
         # first, get all filter cols that are marked with filter_col_suffix,
@@ -239,15 +246,14 @@ class DataQualityCheck(abc.ABC):
                     break  # no need to loop any further
 
             else:  # no break
-                raise ValueError(f"{filter_key}_filter_column has no corresponding value!")
+                msg = f"{filter_key}_filter_column has no corresponding value!"
+                raise KoalityError(msg)
 
         return filters
 
     @staticmethod
     def assemble_where_statement(filters: dict[str, dict[str, Any]]) -> str:
-        """
-        Generates the where statement for the check query using the specified
-        filters.
+        """Generate the where statement for the check query using the specified filters.
 
         Args:
             filters: A dict containing filter specifications, e.g.,
@@ -265,8 +271,8 @@ class DataQualityCheck(abc.ABC):
         Returns:
             A WHERE statement to restrict the data being used for the check, e.g.,
             'WHERE shop_code = "SHOP01" AND date = "2023-01-01"'
-        """
 
+        """
         if len(filters) == 0:
             return ""
 
@@ -278,9 +284,7 @@ class DataQualityCheck(abc.ABC):
 
 
 class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
-    """
-    Abstract class for data quality checks performing checks on a specific
-    column of a table.
+    """Abstract class for data quality checks performing checks on a specific column of a table.
 
     Args:
         transformation_name: The name to refer to this check (in combination with check_column)
@@ -290,6 +294,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         upper_threshold: Check will fail if check result > upper_threshold
         monitor_only: If True, no checks will be performed
         extra_info: Optional additional text that will be added to the end of the failure message
+
     """
 
     def __init__(
@@ -301,10 +306,12 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         check_column: str | None = None,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the column transformation check."""
         self.transformation_name = transformation_name
 
         super().__init__(
@@ -320,13 +327,15 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         )
 
     def assemble_name(self) -> str:
-        return f"{self.check_column.split('.')[-1]}" + "_" + f"{self.transformation_name}"
+        """Return the check name combining column and transformation."""
+        return f"{self.check_column.split('.')[-1]}_{self.transformation_name}"
 
     @abc.abstractmethod
     def transformation_statement(self) -> str:
-        pass
+        """Return the SQL transformation statement for this check."""
 
     def query_boilerplate(self, metric_statement: str) -> str:
+        """Return the base SQL query structure with the given metric statement."""
         return f"""
         SELECT
             {metric_statement}
@@ -335,6 +344,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         """
 
     def assemble_query(self) -> str:
+        """Assemble the complete SQL query for this check."""
         main_query = self.query_boilerplate(self.transformation_statement())
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -343,6 +353,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         return main_query
 
     def assemble_data_exists_query(self) -> str:
+        """Assemble the SQL query to check if data exists in the table."""
         data_exists_query = f"""
         SELECT
             IF(COUNT(*) > 0, '', '{self.table}') AS empty_table
@@ -357,14 +368,11 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
 
 
 class NullRatioCheck(ColumnTransformationCheck):
-    """
-    Checks the share of NULL values in a specific column of a table. It inherits from
-    `koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
-    descriptions in its super class.
+    """Check the share of NULL values in a specific column of a table.
 
+    Inherits from ColumnTransformationCheck; see its documentation for argument descriptions.
 
     Example:
-
     NullRatioCheck(
         database_accessor="project.dataset",
         database_provider=None,
@@ -377,6 +385,7 @@ class NullRatioCheck(ColumnTransformationCheck):
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
+
     """
 
     def __init__(
@@ -387,10 +396,12 @@ class NullRatioCheck(ColumnTransformationCheck):
         check_column: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the null ratio check."""
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -405,6 +416,7 @@ class NullRatioCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for calculating null ratio."""
         return f"""
             CASE
                 WHEN COUNT(*) = 0 THEN 0.0
@@ -414,18 +426,15 @@ class NullRatioCheck(ColumnTransformationCheck):
 
 
 class RegexMatchCheck(ColumnTransformationCheck):
-    """
-    Checks the share of values matching a regex in a specific column of a table. It
-    inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to
-    argument descriptions in its super class, except for regex_to_match which is
-    added in this subclass.
+    """Check the share of values matching a regex in a specific column of a table.
+
+    Inherits from ColumnTransformationCheck; see its documentation for argument descriptions.
 
     Args:
         regex_to_match: The regular expression to be checked on check_column (e.g.,
                         "SHOP[0-9]{2}-.*" to check for a shop code prefix like "SHOP01-")
 
     Example:
-
     RegexMatchCheck(
         database_accessor="project.dataset",
         database_provider=None,
@@ -437,6 +446,7 @@ class RegexMatchCheck(ColumnTransformationCheck):
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
+
     """
 
     def __init__(
@@ -448,10 +458,12 @@ class RegexMatchCheck(ColumnTransformationCheck):
         regex_to_match: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the regex match check."""
         self.regex_to_match = regex_to_match
 
         super().__init__(
@@ -468,15 +480,14 @@ class RegexMatchCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for calculating regex match ratio."""
         return f"""AVG(IF(REGEXP_MATCHES({self.check_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
 
 
 class ValuesInSetCheck(ColumnTransformationCheck):
-    """
-    Checks the share of values that match any value of a value set in a specific
-    column of a table. It inherits from `koality.checks.ColumnTransformationCheck`,
-    and thus, we refer to argument descriptions in its super class, except for
-    value set which is added in this subclass.
+    """Check the share of values that match any value of a value set in a column.
+
+    Inherits from ColumnTransformationCheck; see its documentation for argument descriptions.
 
     Args:
         value_set: A list of values (or a string representation of such a list) to be checked.
@@ -486,7 +497,6 @@ class ValuesInSetCheck(ColumnTransformationCheck):
                    - '("shoes", "toys")'
 
     Example:
-
     ValuesInSetCheck(
         database_accessor="project.dataset",
         database_provider=None,
@@ -500,6 +510,7 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
+
     """
 
     def __init__(
@@ -511,14 +522,17 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         value_set: str | bytes | Iterable,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         transformation_name: str | None = None,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the values in set check."""
         self.value_set = to_set(value_set)
         if not self.value_set:
-            raise ValueError("'value_set' must not be empty")
+            msg = "'value_set' must not be empty"
+            raise KoalityError(msg)
         self.value_set_string = f"({str(self.value_set)[1:-1]})"
 
         super().__init__(
@@ -535,20 +549,20 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for calculating values in set ratio."""
         return f"""AVG(IF({self.check_column} IN {self.value_set_string}, 1, 0)) AS {self.name}"""
 
 
 class RollingValuesInSetCheck(ValuesInSetCheck):
-    """
-    Checks the share of values that match any value of a value set in a specific
-    column of a table similar to `ValuesInSetCheck`, but the share is computed for
-    a longer time period (currently also including data of the 14 days before the
-    actual check date). It inherits from `koality.checks.ValuesInSetCheck`,
-    and thus, also from `koality.checks.ColumnTransformationCheck`,
-    thus, we also refer to argument descriptions in its super class.
+    """Check share of values matching a value set over a rolling time period.
+
+    Similar to `ValuesInSetCheck`, but the share is computed for a longer time period
+    (currently also including data of the 14 days before the actual check date).
+    It inherits from `koality.checks.ValuesInSetCheck`, and thus, also from
+    `koality.checks.ColumnTransformationCheck`, so we refer to argument descriptions
+    in its super class.
 
     Example:
-
     RollingValuesInSetCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -562,6 +576,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
+
     """
 
     def __init__(
@@ -575,10 +590,12 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         date_filter_value: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the rolling values in set check."""
         self.date_filter_column = date_filter_column
         self.date_filter_value = date_filter_value
 
@@ -603,11 +620,12 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         }
 
     def assemble_query(self) -> str:
+        """Assemble query with rolling date range for values in set check."""
         main_query = self.query_boilerplate(self.transformation_statement())
 
         main_query += (
             "WHERE\n    "
-            + f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"  # noqa: E501
+            f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"  # noqa: E501
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -617,13 +635,11 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
 
 class DuplicateCheck(ColumnTransformationCheck):
-    """
-    Checks the number of duplicates for a specific column, i.e., all counts - distinct
-    counts. It inherits from `koality.checks.ColumnTransformationCheck`, and thus, we
-    refer to argument descriptions in its super class.
+    """Check the number of duplicates for a specific column.
+
+    Counts all rows minus distinct counts. Inherits from ColumnTransformationCheck.
 
     Example:
-
     DuplicateCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -636,6 +652,7 @@ class DuplicateCheck(ColumnTransformationCheck):
         lower_threshold=0.0,
         upper_threshold=0.0,
     )
+
     """
 
     def __init__(
@@ -646,10 +663,12 @@ class DuplicateCheck(ColumnTransformationCheck):
         check_column: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the duplicate check."""
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -664,15 +683,16 @@ class DuplicateCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for counting duplicates."""
         return f"COUNT(*) - COUNT(DISTINCT {self.check_column}) AS {self.name}"
 
 
 class CountCheck(ColumnTransformationCheck):
-    """
-    Checks the number of rows or distinct values of a specific column. It inherits from
-    `koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
-    descriptions in its super class, except for the `distinct` argument which is added in
-    this subclass.
+    """Check the number of rows or distinct values of a specific column.
+
+    Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to
+    argument descriptions in its super class, except for the `distinct` argument which
+    is added in this subclass.
 
     Args:
         distinct: Indicates if the count should count all rows or only distinct values
@@ -680,7 +700,6 @@ class CountCheck(ColumnTransformationCheck):
                   Note: distinct=True cannot be used with check_column="*".
 
     Example:
-
     CountCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -694,6 +713,7 @@ class CountCheck(ColumnTransformationCheck):
         lower_threshold=10000.0,
         upper_threshold=99999.0,
     )
+
     """
 
     def __init__(
@@ -702,15 +722,18 @@ class CountCheck(ColumnTransformationCheck):
         database_provider: DatabaseProvider | None,
         table: str,
         check_column: str,
-        distinct: bool = False,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
+        distinct: bool = False,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the count check."""
         if check_column == "*" and distinct:
-            raise KoalityError("Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False.")
+            msg = "Cannot COUNT(DISTINCT *)! Either set check_column != '*' or distinct = False."
+            raise KoalityError(msg)
 
         self.distinct = distinct
 
@@ -728,12 +751,14 @@ class CountCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for counting rows or distinct values."""
         if self.distinct:
             return f"COUNT(DISTINCT {self.check_column}) AS {self.name}"
 
         return f"COUNT({self.check_column}) AS {self.name}"
 
     def assemble_name(self) -> str:
+        """Return the check name, using 'row_' prefix for wildcard columns."""
         if self.check_column == "*":
             return f"row_{self.transformation_name}"
 
@@ -741,8 +766,7 @@ class CountCheck(ColumnTransformationCheck):
 
 
 class AverageCheck(ColumnTransformationCheck):
-    """
-    Computes the average (AVG) of a numeric column for the filtered rows.
+    """Compute the average (AVG) of a numeric column for the filtered rows.
 
     Inherits from ColumnTransformationCheck. Thresholds apply to the computed average.
     """
@@ -755,10 +779,12 @@ class AverageCheck(ColumnTransformationCheck):
         check_column: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the average check."""
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -773,12 +799,12 @@ class AverageCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for computing the average."""
         return f"AVG({self.check_column}) AS {self.name}"
 
 
 class MaxCheck(ColumnTransformationCheck):
-    """
-    Computes the maximum (MAX) of a column for the filtered rows.
+    """Compute the maximum (MAX) of a column for the filtered rows.
 
     Inherits from ColumnTransformationCheck. Thresholds apply to the computed maximum.
     """
@@ -791,10 +817,12 @@ class MaxCheck(ColumnTransformationCheck):
         check_column: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the max check."""
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -809,12 +837,12 @@ class MaxCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for computing the maximum."""
         return f"MAX({self.check_column}) AS {self.name}"
 
 
 class MinCheck(ColumnTransformationCheck):
-    """
-    Computes the minimum (MIN) of a column for the filtered rows.
+    """Compute the minimum (MIN) of a column for the filtered rows.
 
     Inherits from ColumnTransformationCheck. Thresholds apply to the computed minimum.
     """
@@ -827,10 +855,12 @@ class MinCheck(ColumnTransformationCheck):
         check_column: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the min check."""
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
@@ -845,15 +875,16 @@ class MinCheck(ColumnTransformationCheck):
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for computing the minimum."""
         return f"MIN({self.check_column}) AS {self.name}"
 
 
 class OccurrenceCheck(ColumnTransformationCheck):
-    """
-    Checks how often *any* value in a column occurs.
-    It inherits from`koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
-      descriptions in its super class.
-    Useful e.g. to check for a single product occurring unusually often (likely an error)
+    """Check how often any value in a column occurs.
+
+    Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to argument
+    descriptions in its super class.
+    Useful e.g. to check for a single product occurring unusually often (likely an error).
 
     Args:
         max_or_min: Check either the maximum or minimum occurrence of any value.
@@ -861,7 +892,6 @@ class OccurrenceCheck(ColumnTransformationCheck):
                     If you want to check if any value occurs less than y times, use 'min' and lower_threshold=y
 
     Example:
-
     OccurrenceCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -875,6 +905,7 @@ class OccurrenceCheck(ColumnTransformationCheck):
         lower_threshold=0,
         upper_threshold=500,
     )
+
     """
 
     def __init__(
@@ -882,22 +913,39 @@ class OccurrenceCheck(ColumnTransformationCheck):
         database_accessor: str,
         database_provider: DatabaseProvider | None,
         max_or_min: Literal["max", "min"],
+        table: str,
+        check_column: str,
+        lower_threshold: float = -math.inf,
+        upper_threshold: float = math.inf,
+        *,
+        monitor_only: bool = False,
+        extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the occurrence check."""
         if max_or_min not in ("max", "min"):
-            raise ValueError("'max_or_min' not one of supported modes 'min' or 'max'")
+            msg = "'max_or_min' must be one of supported modes 'min' or 'max'"
+            raise KoalityError(msg)
         self.max_or_min = max_or_min
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
             transformation_name=f"occurrence_{max_or_min}",
+            table=table,
+            check_column=check_column,
+            lower_threshold=lower_threshold,
+            upper_threshold=upper_threshold,
+            monitor_only=monitor_only,
+            extra_info=extra_info,
             **kwargs,
         )
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for counting occurrences."""
         return f"{self.check_column}, COUNT(*) AS {self.name}"
 
     def assemble_query(self) -> str:
+        """Assemble query to find max or min occurrence of any value."""
         # Since koality checks only the first entry, the table with value + count_occurence is
         # ordered DESC/ASC depending on whether max/min occurence is supposed to be checked.
         order = {"max": "DESC", "min": "ASC"}[self.max_or_min]
@@ -911,8 +959,7 @@ class OccurrenceCheck(ColumnTransformationCheck):
 
 
 class MatchRateCheck(DataQualityCheck):
-    """
-    Checks the match rate between two tables after joining on specific columns.
+    """Checks the match rate between two tables after joining on specific columns.
 
     If left_join_columns (or right_join_columns) is defined, these columns will be
     used for joining the data. If not, join_columns will be used as fallback.
@@ -934,7 +981,6 @@ class MatchRateCheck(DataQualityCheck):
         extra_info: Optional additional text that will be added to the end of the failure message
 
     Example:
-
     MatchRateCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -948,6 +994,7 @@ class MatchRateCheck(DataQualityCheck):
         date_filter_column="DATE",  # optional
         date_filter_value="2023-01-01",  # optional
     )
+
     """
 
     def __init__(
@@ -962,17 +1009,18 @@ class MatchRateCheck(DataQualityCheck):
         join_columns_right: list[str] | None = None,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the match rate check."""
         self.left_table = left_table
         self.right_table = right_table
 
         if not (join_columns or (join_columns_left and join_columns_right)):
-            raise KoalityError(
-                "No join_columns was provided. Use either join_columns or join_columns_left and join_columns_right"
-            )
+            msg = "No join_columns was provided. Use either join_columns or join_columns_left and join_columns_right"
+            raise KoalityError(msg)
 
         # mypy typing does not understand that None is not possible, thus, we
         # add `or []`
@@ -980,15 +1028,15 @@ class MatchRateCheck(DataQualityCheck):
         self.join_columns_right: list[str] = join_columns_right if join_columns_right else join_columns or []
 
         if not self.join_columns_right or not self.join_columns_left:
-            raise KoalityError(
-                "No join_columns was provided. Use join_columns, join_columns_left, and/or join_columns_right"
-            )
+            msg = "No join_columns was provided. Use join_columns, join_columns_left, and/or join_columns_right"
+            raise KoalityError(msg)
 
         if len(self.join_columns_left) != len(self.join_columns_right):
-            raise KoalityError(
-                "join_columns_left and join_columns_right need to have equal length"
+            msg = (
+                f"join_columns_left and join_columns_right need to have equal length"
                 f" ({len(self.join_columns_left)} vs. {len(self.join_columns_right)})."
             )
+            raise KoalityError(msg)
 
         super().__init__(
             database_accessor=database_accessor,
@@ -1006,16 +1054,18 @@ class MatchRateCheck(DataQualityCheck):
         self.filters_right = self.filters | self.get_filters(kwargs, filter_col_suffix="filter_column_right")
 
     def assemble_name(self) -> str:
+        """Return the check name for match rate."""
         return f"{self.check_column.split('.')[-1]}_matchrate"
 
     def assemble_query(self) -> str:
+        """Assemble the SQL query for calculating match rate between tables."""
         right_column_statement = ",\n    ".join(self.join_columns_right)
 
         join_on_statement = "\n    AND\n    ".join(
             [
                 f"lefty.{left_col} = righty.{right_col.split('.')[-1]}"
                 for left_col, right_col in zip(self.join_columns_left, self.join_columns_right, strict=False)
-            ]
+            ],
         )
 
         return f"""
@@ -1050,13 +1100,12 @@ class MatchRateCheck(DataQualityCheck):
         """
 
     def assemble_data_exists_query(self) -> str:
-        """
-        First checks left, then right table for data.
+        """First checks left, then right table for data.
 
         Returns:
             Empty table name or empty string
-        """
 
+        """
         return f"""
         WITH
         righty AS (
@@ -1081,13 +1130,14 @@ class MatchRateCheck(DataQualityCheck):
                 IF((SELECT * FROM righty) > 0, '', '{self.right_table}'),
                 '{self.left_table}'
             ) AS empty_table
-        """  # noqa: S608
+        """
 
 
 class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts parameter?
-    """
-    Checks the relative change of a count in comparison to the average counts of a
-    number of historic days before the check date.
+    """Check the relative change of a count compared to historic average.
+
+    Compares the count to the average counts of a number of historic days before
+    the check date.
 
     Args:
         table: Name of table (e.g., "my-gcp-project.SHOP01.feature_category")
@@ -1102,7 +1152,6 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         extra_info: Optional additional text that will be added to the end of the failure message
 
     Example:
-
     RelCountChangeCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -1116,6 +1165,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         lower_threshold=-0.15,
         upper_threshold=0.15,
     )
+
     """
 
     def __init__(
@@ -1129,10 +1179,12 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         date_filter_value: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the relative count change check."""
         self.rolling_days = rolling_days
         self.date_filter_value = date_filter_value
         self.date_filter_column = date_filter_column
@@ -1156,9 +1208,11 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         }
 
     def assemble_name(self) -> str:
-        return f"{self.check_column.split('.')[-1]}" + "_count_change"
+        """Return the check name for count change."""
+        return f"{self.check_column.split('.')[-1]}_count_change"
 
     def assemble_query(self) -> str:
+        """Assemble the SQL query for calculating relative count change."""
         where_statement = self.assemble_where_statement(self.filters).replace("WHERE", "AND")
 
         return f"""
@@ -1209,9 +1263,10 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             JOIN
                 rolling_avgs
             ON TRUE
-        """  # noqa: S608, E501
+        """  # noqa: E501
 
     def assemble_data_exists_query(self) -> str:
+        """Assemble the SQL query to check if data exists for the check date."""
         data_exists_query = f"""
         SELECT
             IF(COUNT(*) > 0, '', '{self.table}') AS empty_table
@@ -1226,19 +1281,18 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
 
 
 class IqrOutlierCheck(ColumnTransformationCheck):
-    """
-    Checks if the date-specific value of a column is an outlier based on the
-    interquartile range (IQR) method. It inherits from `koality.checks.ColumnTransformationCheck`,
-    and thus, we refer to argument descriptions in its super class, except for the
-    `date` and `date_filter_column` arguments which are added in this sub class.
+    """Check if a column value is an outlier based on the interquartile range (IQR) method.
+
+    Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to
+    argument descriptions in its super class, except for the `date` and `date_filter_column`
+    arguments which are added in this subclass.
 
     The IQR method is based on the 25th and 75th percentiles of the data. The
     thresholds are calculated as follows:
-    - lower_threshold = q25 - iqr_factor * (q75 - q25)
-
+        - lower_threshold = q25 - iqr_factor * (q75 - q25)
+        - upper_threshold = q75 + iqr_factor * (q75 - q25)
 
     Example:
-
     IqrOutlierCheck(
         database_accessor="my-gcp-project.SHOP01",
         database_provider=None,
@@ -1252,7 +1306,10 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         shop_id_filter_column="shop_code",  # optional
         shop_id_filter_value="SHOP01",  # optional
     )
+
     """
+
+    MIN_IQR_FACTOR = 1.5
 
     def __init__(
         self,
@@ -1265,21 +1322,26 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         interval_days: int,
         how: Literal["both", "upper", "lower"],
         iqr_factor: float,
+        *,
         monitor_only: bool = False,
         extra_info: str | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the IQR outlier check."""
         self.date_filter_column = date_filter_column
         self.date_filter_value = date_filter_value
         if interval_days < 1:
-            raise ValueError("interval_days must be at least 1")
+            msg = "interval_days must be at least 1"
+            raise KoalityError(msg)
         self.interval_days = int(interval_days)
         if how not in ["both", "upper", "lower"]:
-            raise ValueError("how must be one of 'both', 'upper', 'lower'")
+            msg = "how must be one of 'both', 'upper', 'lower'"
+            raise KoalityError(msg)
         self.how = how
         # reasonable lower bound for iqr_factor
-        if iqr_factor < 1.5:
-            raise ValueError("iqr_factor must be at least 1.5")
+        if iqr_factor < self.MIN_IQR_FACTOR:
+            msg = f"iqr_factor must be at least {self.MIN_IQR_FACTOR}"
+            raise KoalityError(msg)
         self.iqr_factor = float(iqr_factor)
 
         super().__init__(
@@ -1302,13 +1364,14 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         }
 
     def transformation_statement(self) -> str:
+        """Return the SQL statement for IQR-based outlier detection."""
         # TODO: currently we only raise an error if there is no data for the date
         #       we could also raise an error if there is not enough data for the
         #       IQR calculation
         where_statement = ""
         filter_columns = ""
         if self.filters:
-            filter_columns = ",\n".join([v["column"] for k, v in self.filters.items()])
+            filter_columns = ",\n".join([v["column"] for v in self.filters.values()])
             filter_columns = ",\n" + filter_columns
             where_statement = self.assemble_where_statement(self.filters)
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
@@ -1350,9 +1413,10 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                 LEFT JOIN percentiles
                 ON TRUE
             )
-        """  # noqa: S608, E501
+        """  # noqa: E501
 
     def query_boilerplate(self, metric_statement: str) -> str:
+        """Return the query structure for IQR outlier detection."""
         return f"""
             {metric_statement}
 
@@ -1363,6 +1427,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         """
 
     def _check(self, duckdb_client: duckdb.DuckDBPyConnection, query: str) -> tuple[list[dict], str | None]:
+        """Execute check and update thresholds from IQR calculation."""
         result, error = super()._check(duckdb_client, query)
         # overwrite the lower and upper thresholds as required
         if result:
@@ -1373,6 +1438,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         return result, error
 
     def assemble_data_exists_query(self) -> str:
+        """Assemble the query to check if data exists for IQR outlier detection."""
         data_exists_query = f"""
         SELECT
             IF(COUNTIF({self.check_column} IS NOT NULL) > 0, '', '{self.table}') AS empty_table

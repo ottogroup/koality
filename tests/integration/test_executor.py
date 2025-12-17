@@ -1,3 +1,5 @@
+"""Integration tests for CheckExecutor."""
+
 from pathlib import Path
 from textwrap import dedent
 
@@ -35,8 +37,9 @@ def duckdb_client() -> duckdb.DuckDBPyConnection:
     return conn
 
 
-@pytest.fixture()
+@pytest.fixture
 def config_file_success(tmp_path: Path) -> Path:
+    """Create a config file with all checks expected to succeed."""
     content = dedent(
         f"""
         name: koality-all-success
@@ -70,15 +73,16 @@ def config_file_success(tmp_path: Path) -> Path:
             checks:
               - shop_id: SHOP001
               - shop_id: SHOP002
-        """
+        """,
     ).strip()
     tmp_file = tmp_path / "koality_config.yaml"
     tmp_file.write_text(content)
     return tmp_file
 
 
-@pytest.fixture()
+@pytest.fixture
 def config_file_failure(tmp_path: Path) -> Path:
+    """Create a config file with a check expected to fail."""
     content = dedent(
         f"""
         name: koality-failure
@@ -98,7 +102,7 @@ def config_file_failure(tmp_path: Path) -> Path:
               - shop_id: SHOP002
                 check_type: FailureCheck
                 name_suffix: "1-2"
-        """
+        """,
     ).strip()
     tmp_file = tmp_path / "koality_config.yaml"
     tmp_file.write_text(content)
@@ -132,14 +136,14 @@ def config_file_failure_v2(tmp_path: Path) -> Path:
               - shop_id: SHOP002
                 lower_threshold: 0
                 upper_threshold: 10
-        """
+        """,
     ).strip()
     tmp_file = tmp_path / "koality_config.yaml"
     tmp_file.write_text(content)
     return tmp_file
 
 
-@pytest.fixture()
+@pytest.fixture
 def config_file_missing_data_v2(tmp_path: Path) -> Path:
     """Config that queries a non-existent table to trigger data_exists failure."""
     content = dedent(
@@ -164,7 +168,7 @@ def config_file_missing_data_v2(tmp_path: Path) -> Path:
             checks:
               - shop_id: SHOP001
               - shop_id: SHOP002
-        """
+        """,
     ).strip()
     tmp_file = tmp_path / "koality_config.yaml"
     tmp_file.write_text(content)
@@ -172,6 +176,7 @@ def config_file_missing_data_v2(tmp_path: Path) -> Path:
 
 
 def test_executor_all_success(config_file_success: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test executor passes when all checks succeed."""
     config = parse_yaml_raw_as(Config, config_file_success.read_text())
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
     result_dict = executor()
@@ -185,6 +190,7 @@ def test_executor_all_success(config_file_success: Path, duckdb_client: duckdb.D
 
 
 def test_executor_failure(config_file_failure_v2: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test executor reports failure when a check fails threshold."""
     config = parse_yaml_raw_as(Config, config_file_failure_v2.read_text())
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
     result_dict = executor()
@@ -201,6 +207,7 @@ def test_executor_failure(config_file_failure_v2: Path, duckdb_client: duckdb.Du
 
 
 def test_executor_missing_data(config_file_missing_data_v2: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test executor reports failure when table has no data."""
     # Create empty table
     duckdb_client.execute("""
         CREATE TABLE empty_table (

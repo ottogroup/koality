@@ -1,3 +1,5 @@
+"""Integration tests for basic check classes."""
+
 import duckdb
 import pytest
 
@@ -28,6 +30,7 @@ def duckdb_client() -> duckdb.DuckDBPyConnection:
 
 
 def test_message_no_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that failure message is correctly formatted without extra info."""
     check = CountCheck(
         database_accessor="",
         database_provider=None,
@@ -48,6 +51,7 @@ def test_message_no_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None
 
 
 def test_message_date_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that failure message includes date_info when provided."""
     check = CountCheck(
         database_accessor="",
         database_provider=None,
@@ -70,6 +74,7 @@ def test_message_date_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_message_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that failure message includes extra_info when provided."""
     check = CountCheck(
         database_accessor="",
         database_provider=None,
@@ -92,10 +97,7 @@ def test_message_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_message_correct_formatting() -> None:
-    """
-    Test checks if output still returns a useful formatted value even if
-    rounding by min_precision would lead to zero.
-    """
+    """Test that output returns a useful formatted value even when rounding leads to zero."""
     # Create a separate duckdb client with specific test data for this test
     conn = duckdb.connect(":memory:")
     conn.execute("""

@@ -1,3 +1,5 @@
+"""Integration tests for MatchRateCheck."""
+
 import duckdb
 import pytest
 
@@ -116,11 +118,12 @@ def duckdb_client_renamed() -> duckdb.DuckDBPyConnection:
 
 
 def test_match_rate_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
-    """
-    Simple check for match rate:
+    """Test match rate check with shop and date filtering.
+
+    Validates:
     - 4 / 5 product_numbers of purchases should be found
-    - tests if data before / after check day are excluded
-    - tests if data of other shops are excluded
+    - Data before / after check day are excluded
+    - Data of other shops are excluded
     """
     check = MatchRateCheck(
         database_accessor="",
@@ -179,7 +182,7 @@ def test_match_rate_check_different_join_col_names(duckdb_client_renamed: duckdb
 
 
 @pytest.mark.parametrize(
-    "day,shop",
+    ("day", "shop"),
     [
         ("2023-01-01", "SHOP999"),
         ("2022-12-30", "SHOP001"),

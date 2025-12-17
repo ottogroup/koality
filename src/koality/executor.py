@@ -3,6 +3,7 @@
 import datetime
 import logging
 from collections import defaultdict
+from pathlib import Path
 
 import duckdb
 
@@ -80,15 +81,16 @@ DATA_TYPES: dict[str, dict[str, str]] = defaultdict(
 
 
 class CheckExecutor:
-    """
-    Provides all the logic to actually run checks. It contains methods to
-    execute checks, to create the failed checks log, and to export DQM
-    results to a database table.
+    """Provide all the logic to actually run checks.
+
+    Contains methods to execute checks, to create the failed checks log,
+    and to export DQM results to a database table.
 
     Args:
         config: Koality configuration object
         duckdb_client: DuckDB client for interacting with DuckDB (optional).
             If not provided, an in-memory connection will be created.
+
     """
 
     def __init__(
@@ -97,6 +99,7 @@ class CheckExecutor:
         duckdb_client: duckdb.DuckDBPyConnection | None = None,
         **kwargs: object,
     ) -> None:
+        """Initialize the check executor with configuration and optional DuckDB client."""
         self.config = config
         if duckdb_client is not None:
             self.duckdb_client = duckdb_client
@@ -118,30 +121,30 @@ class CheckExecutor:
 
     @staticmethod
     def aggregate_values(value_list: list[str]) -> str:
+        """Join a list of values into a comma-separated, sorted, deduplicated string."""
         return ", ".join(sorted(set(value_list)))
 
     def execute_checks(self) -> None:
-        """
-        Instantiates and executes all checks using a `ThreadPoolExecutor`. When walking
-        through the different checks, parameters are updated using global defaults,
-        check defaults of bundles, and a check's parameters. Check results are stored
-        in a results dict for further processing.
-        """
+        """Instantiate and execute all checks.
 
+        When walking through the different checks, parameters are updated using global
+        defaults, check defaults of bundles, and a check's parameters. Check results
+        are stored in a results dict for further processing.
+        """
         results = []
         database_provider = None
         if self.config.database_accessor:
             database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
         for check_bundle in self.config.check_bundles:
-            for check in check_bundle.checks:
-                check_factory = CHECK_MAP[check.check_type]
-                check_kwargs = check.model_dump(exclude={"check_type"}, exclude_unset=True)
+            for check_config in check_bundle.checks:
+                check_factory = CHECK_MAP[check_config.check_type]
+                check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_unset=True)
                 check_kwargs["database_accessor"] = self.config.database_accessor
                 check_kwargs["database_provider"] = database_provider
-                check = check_factory(**check_kwargs)
-                self.checks.append(check)
+                check_instance = check_factory(**check_kwargs)
+                self.checks.append(check_instance)
 
-                results.append(check(self.duckdb_client))
+                results.append(check_instance(self.duckdb_client))
 
         for check in self.checks:
             if check.status in ("FAIL", "ERROR"):
@@ -151,22 +154,21 @@ class CheckExecutor:
         self.result_dicts = results
 
     def _aggregate_checks_msgs(self, msg_list: list[str]) -> list[str]:
-        """
-        Aggregates a list of (failure) check messages. The reason behind is
-        that if data tables to be checked do not contain any data,
-        a specific failure will be created. As a larger number of such
-        failures can be created (for different checks or for different
-        shop IDs), we aggregate missing data failures, grouping them
-        by table and date and joining all distinct shop IDs to a
-        comma-separated list.
+        """Aggregate a list of (failure) check messages.
+
+        If data tables to be checked do not contain any data, a specific failure
+        will be created. As a larger number of such failures can be created (for
+        different checks or for different shop IDs), we aggregate missing data
+        failures, grouping them by table and date and joining all distinct shop
+        IDs to a comma-separated list.
 
         Args:
             msg_list: A list of failure messages.
 
         Returns:
             A list of failure messages with aggregated missing data messages.
-        """
 
+        """
         # Other messages to be left untouched
         msgs_other = [msg for msg in msg_list if not msg.startswith("No data")]
 
@@ -175,9 +177,10 @@ class CheckExecutor:
 
         # Group and aggregate messages
         grouped_data = {}
+        expected_parts_count = 2
         for msg in msgs_no_data:
             parts = msg.split(":", 1)
-            if len(parts) == 2:
+            if len(parts) == expected_parts_count:
                 table_part = parts[0]
                 shop_id = parts[1].strip()
                 if table_part not in grouped_data:
@@ -191,22 +194,21 @@ class CheckExecutor:
         return msgs_no_data + msgs_other
 
     def _aggregate_result_dicts(self, result_dicts: list[dict]) -> list[dict]:
-        """
-        Aggregates a list of check result dicts. The reason behind is
-        that if data tables to be checked do not contain any data,
-        a specific failure will be created. As a larger number of such
-        failures can be created (for different checks or for different
-        shop IDs), we aggregate missing data failures, grouping them
-        by table and date and joining all distinct shop IDs to a
-        comma-separated list.
+        """Aggregate a list of check result dicts.
+
+        If data tables to be checked do not contain any data, a specific failure
+        will be created. As a larger number of such failures can be created (for
+        different checks or for different shop IDs), we aggregate missing data
+        failures, grouping them by table and date and joining all distinct shop
+        IDs to a comma-separated list.
 
         Args:
             result_dicts: A list of check result dicts.
 
         Returns:
             A list of check result dicts with aggregated missing data results.
-        """
 
+        """
         # Other results to be left untouched
         result_other = [result for result in result_dicts if result["METRIC_NAME"] != "data_exists"]
 
@@ -247,14 +249,14 @@ class CheckExecutor:
         return result_no_data + result_other
 
     def get_failed_checks_msg(self) -> str:
-        """
-        Get an aggregated message for all failed checks. Uses the message attribute of
-        all checks and aggregates it.
+        """Get an aggregated message for all failed checks.
+
+        Uses the message attribute of all checks and aggregates it.
 
         Returns:
-            aggregated, sorted, newline separated messages of failed checks
-        """
+            Aggregated, sorted, newline separated messages of failed checks.
 
+        """
         failed_checks_msgs = [check.message for check in self.checks if check.message]
         failed_checks_msgs = self._aggregate_checks_msgs(failed_checks_msgs)
         failed_checks_msgs.sort()
@@ -262,11 +264,10 @@ class CheckExecutor:
         return "\n".join(failed_checks_msgs)
 
     def load_to_database(self) -> None:
-        """
-        Persists koality's DQM results in a BQ table. The result table is partitioned by
-        DATE. DQM data is always appended to table.
-        """
+        """Persist koality's DQM results in a BQ table.
 
+        The result table is partitioned by DATE. DQM data is always appended to table.
+        """
         if self.result_table is None:
             log.info("result_table is None. Results were not persisted.")
             return
@@ -275,7 +276,7 @@ class CheckExecutor:
             log.info("No entries in results from checks, so no results were persisted.")
             return
 
-        now = datetime.datetime.now()
+        now = datetime.datetime.now(tz=datetime.UTC)
 
         # Copy rows first, cause INSERT_TIMESTAMP and AUTO value is only a BQ feature and not needed anywhere else
         results_with_it: list[dict] = self._aggregate_result_dicts(self.result_dicts).copy()
@@ -307,7 +308,8 @@ class CheckExecutor:
                     database_provider,
                 )
             except duckdb.Error as e:
-                raise DatabaseError(f"Could not create or replace table {self.result_table}") from e
+                msg = f"Could not create or replace table {self.result_table}"
+                raise DatabaseError(msg) from e
 
             # Convert results_with_it to VALUES clause
             values_clause = ", ".join(
@@ -327,7 +329,7 @@ class CheckExecutor:
                     )
                 """
                     for row in results_with_it
-                ]
+                ],
             )
             query_insert_values_into_result_table = f"""
                 INSERT INTO {self.result_table}
@@ -341,16 +343,21 @@ class CheckExecutor:
                     database_provider,
                 )
             except duckdb.Error as e:
-                raise DatabaseError(f"Could not insert rows into table {self.result_table}") from e
+                msg = f"Could not insert rows into table {self.result_table}"
+                raise DatabaseError(msg) from e
 
+            accessor_prefix = f"{self.config.database_accessor}." if self.config.database_accessor else ""
             log.info(
-                f"{len(results_with_it)} entries were persisted to "
-                f"{f'{self.config.database_accessor}.' if self.config.database_accessor else ''}{self.result_table}"
+                "%d entries were persisted to %s%s",
+                len(results_with_it),
+                accessor_prefix,
+                self.result_table,
             )
 
     def __call__(self) -> list[dict]:
+        """Execute all checks and return results."""
         self.execute_checks()
-        log.info(f"Ran {len(self.checks)} checks")
+        log.info("Ran %d checks", len(self.checks))
 
         if self.check_failed:
             log.info(self.get_failed_checks_msg())
@@ -363,8 +370,8 @@ class CheckExecutor:
             if not failed_checks_msg:
                 log.info("No failed checks, so no log file was written.")
             else:
-                with open(self.log_path, "w", encoding="utf-8") as file:
+                with Path(self.log_path).open("w", encoding="utf-8") as file:
                     file.write(self.get_failed_checks_msg())
-            log.info(f"DQM outputs were written to {self.log_path}")
+            log.info("DQM outputs were written to %s", self.log_path)
 
         return self.result_dicts

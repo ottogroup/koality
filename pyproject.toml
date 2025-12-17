@@ -87,37 +87,17 @@ docs = [
 line-length = 120
 
 [tool.ruff.lint]
-select = [
-    # Bandit
-    "S",
-    # Bugbear
-    "B",
-    # Builtins
-    "A",
-    # comprehensions
-    "C4",
-    # eradicate
-    "ERA",
-    # flake8-2020
-    "YTT",
-    # isort
-    "I",
-    # print
-    "T20",
-    # Pycodestyle
-    "E",
-    "W",
-    # Pyflakes
-    "F",
-    # return
-    "RET",
-    # flake8-annotations
-    "ANN"
+select = ["ALL"]
+ignore = [
+    "PLR0913",  # Too many arguments - check classes need many parameters
+    "TD002",  # Missing author in TODO
+    "TD003",  # Missing issue link for TODO
+    "FIX002",  # Line contains TODO
 ]
 
 [tool.ruff.lint.per-file-ignores]
 "src/koality/checks.py" = ["S608"]
-"tests/*" = ["S101"]
+"tests/*" = ["S101", "PLR2004"]
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"

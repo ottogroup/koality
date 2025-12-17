@@ -14,13 +14,15 @@ from koality.utils import parse_arg
 @click.option("--config_path", required=True, type=click.Path(exists=True, dir_okay=False))
 @click.pass_context
 def cli(ctx: click.Context, config_path: Path) -> None:
-    """
-    CLI for koality. Besides config_path and project_id, additional arguments
-    can be provided that will overrule the global default configuration.
+    """Run koality checks from a configuration file.
+
+    Besides config_path and project_id, additional arguments can be provided
+    that will overrule the global default configuration.
 
     Args:
         ctx: Context of command line invocation (contains extra args)
         config_path: Path to koality configuration file
+
     """
     kwargs = {ctx.args[i].lstrip("-"): ctx.args[i + 1] for i in range(0, len(ctx.args), 2)}
 

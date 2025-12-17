@@ -1,3 +1,5 @@
+"""Integration tests for column transformation checks."""
+
 import math
 
 import duckdb
@@ -16,6 +18,7 @@ from koality.checks import (
     RollingValuesInSetCheck,
     ValuesInSetCheck,
 )
+from koality.exceptions import KoalityError
 
 pytestmark = pytest.mark.integration
 
@@ -211,6 +214,7 @@ def duckdb_client_iqr_latest_value_missing() -> duckdb.DuckDBPyConnection:
 
 
 def test_null_ratio_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test NullRatioCheck returns correct ratio of NULL values."""
     check = NullRatioCheck(
         database_accessor="",
         database_provider=None,
@@ -227,6 +231,7 @@ def test_null_ratio_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_null_ratio_check_empty_table(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test NullRatioCheck returns data_exists failure when no data found."""
     check = NullRatioCheck(
         database_accessor="",
         database_provider=None,
@@ -246,6 +251,7 @@ def test_null_ratio_check_empty_table(duckdb_client: duckdb.DuckDBPyConnection) 
 
 
 def test_regex_match_check_all_matched(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test RegexMatchCheck returns 1.0 when all values match the pattern."""
     check = RegexMatchCheck(
         database_accessor="",
         database_provider=None,
@@ -263,6 +269,7 @@ def test_regex_match_check_all_matched(duckdb_client: duckdb.DuckDBPyConnection)
 
 
 def test_regex_match_check_with_unmatched(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test RegexMatchCheck returns correct ratio with partial matches."""
     check = RegexMatchCheck(
         database_accessor="",
         database_provider=None,
@@ -316,7 +323,7 @@ def test_values_in_set_check_value_not_given(duckdb_client: duckdb.DuckDBPyConne
 
 
 @pytest.mark.parametrize(
-    "day,shop",
+    ("day", "shop"),
     [
         ("2023-01-01", "SHOP999"),
         ("2022-12-31", "SHOP001"),
@@ -399,8 +406,7 @@ def test_rolling_values_in_set_check_value_given_2_days(duckdb_client: duckdb.Du
 
 
 def test_duplicate_check_duplicates(duckdb_client: duckdb.DuckDBPyConnection) -> None:
-    """Simple duplicate check using assortment column for SHOP001
-    which contains 3 distinct values, thus, 4 - 3 = 1 duplicates occur."""
+    """Test duplicate check finds 1 duplicate in assortment column with 3 distinct values."""
     check = DuplicateCheck(
         database_accessor="",
         database_provider=None,
@@ -486,7 +492,7 @@ def test_count_check_distinct_column(duckdb_client: duckdb.DuckDBPyConnection) -
 
 
 @pytest.mark.parametrize(
-    "day,shop",
+    ("day", "shop"),
     [
         ("2023-01-01", "SHOP999"),
         ("2022-12-31", "SHOP001"),
@@ -513,6 +519,7 @@ def test_count_check_regular_no_data(duckdb_client: duckdb.DuckDBPyConnection, d
 
 
 def test_average_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test AverageCheck computes correct mean of column values."""
     check = AverageCheck(
         database_accessor="",
         database_provider=None,
@@ -528,6 +535,7 @@ def test_average_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_max_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test MaxCheck returns the maximum value in the column."""
     check = MaxCheck(
         database_accessor="",
         database_provider=None,
@@ -543,6 +551,7 @@ def test_max_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
 
 
 def test_min_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test MinCheck returns the minimum value in the column."""
     check = MinCheck(
         database_accessor="",
         database_provider=None,
@@ -558,7 +567,7 @@ def test_min_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
 
 
 @pytest.mark.parametrize(
-    "max_or_min,lower_threshold,upper_threshold,expected_value",
+    ("max_or_min", "lower_threshold", "upper_threshold", "expected_value"),
     [
         ("min", 0, 2, 1),  # min occurrence is 1 (several products appear once)
         ("max", 0, 1, 2),  # max occurrence is 2 (SHOP001-0001 appears twice)
@@ -589,7 +598,7 @@ def test_occurrence_check(
 
 def test_occurrence_check_faulty_mode() -> None:
     """Test faulty mode for occurrence check."""
-    with pytest.raises(ValueError) as exec_info:
+    with pytest.raises(KoalityError, match="supported modes 'min' or 'max'"):
         OccurrenceCheck(
             database_accessor="",
             database_provider=None,
@@ -597,10 +606,10 @@ def test_occurrence_check_faulty_mode() -> None:
             table="dummy_table",
             check_column="product_number",
         )
-    assert exec_info.match("supported modes 'min' or 'max'")
 
 
 def test_iqr_outlier_check_success(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck passes when value is within IQR bounds."""
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -620,6 +629,7 @@ def test_iqr_outlier_check_success(duckdb_client_iqr: duckdb.DuckDBPyConnection)
 
 
 def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck works correctly with shop filtering for multiple shops."""
     # Test shop 'abcd'
     check = IqrOutlierCheck(
         database_accessor="",
@@ -660,6 +670,7 @@ def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops: duckdb
 
 
 def test_iqr_outlier_check_failure(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck fails when value is outside IQR bounds."""
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -678,6 +689,7 @@ def test_iqr_outlier_check_failure(duckdb_client_iqr: duckdb.DuckDBPyConnection)
 
 
 def test_iqr_outlier_check_success_because_only_lower(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck passes with how='lower' when value exceeds upper bound."""
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -696,14 +708,15 @@ def test_iqr_outlier_check_success_because_only_lower(duckdb_client_iqr: duckdb.
 
 
 @pytest.mark.parametrize(
-    "option",
+    ("option", "match"),
     [
-        {"interval_days": 0},
-        {"how": "foo"},
-        {"iqr_factor": 1.4},
+        ({"interval_days": 0}, "interval_days must be at least 1"),
+        ({"how": "foo"}, "how must be one of"),
+        ({"iqr_factor": 1.4}, "iqr_factor must be at least"),
     ],
 )
-def test_iqr_outlier_check_value_error(option: dict[str, object]) -> None:
+def test_iqr_outlier_check_value_error(option: dict[str, object], match: str) -> None:
+    """Test IqrOutlierCheck raises ValueError for invalid configuration options."""
     kwargs = {
         "database_accessor": "",
         "database_provider": None,
@@ -715,11 +728,12 @@ def test_iqr_outlier_check_value_error(option: dict[str, object]) -> None:
         "how": "lower",
         "iqr_factor": 1.5,
     } | option
-    with pytest.raises(ValueError):
+    with pytest.raises(KoalityError, match=match):
         IqrOutlierCheck(**kwargs)
 
 
 def test_iqr_outlier_check_data_exists_error(duckdb_client_iqr_latest_value_missing: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck returns data_exists failure when no data for date."""
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -736,6 +750,7 @@ def test_iqr_outlier_check_data_exists_error(duckdb_client_iqr_latest_value_miss
 
 
 def test_iqr_outlier_check_failure_oven_2024_02_12(duckdb_client_iqr_oven: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck fails for oven data on 2024-02-12 with outlier value."""
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
@@ -753,6 +768,7 @@ def test_iqr_outlier_check_failure_oven_2024_02_12(duckdb_client_iqr_oven: duckd
 
 
 def test_iqr_outlier_check_failure_oven_2024_02_13(duckdb_client_iqr_oven: duckdb.DuckDBPyConnection) -> None:
+    """Test IqrOutlierCheck fails for oven data on 2024-02-13 with outlier value."""
     check = IqrOutlierCheck(
         database_accessor="",
         database_provider=None,
