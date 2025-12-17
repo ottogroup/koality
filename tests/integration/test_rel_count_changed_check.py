@@ -1,3 +1,5 @@
+"""Integration tests for RelCountChangeCheck."""
+
 import duckdb
 import pytest
 
@@ -64,19 +66,18 @@ def duckdb_client() -> duckdb.DuckDBPyConnection:
 
 
 @pytest.mark.parametrize(
-    "day,change_rate",
+    ("day", "change_rate"),
     [
         ("2023-01-02", 1.0),  # (8 - 4) / 4
         ("2023-01-03", 0.0),  # (6 - 6) / 6
     ],
 )
 def test_rel_count_change_check_shop_filter(
-    duckdb_client: duckdb.DuckDBPyConnection, day: str, change_rate: float
+    duckdb_client: duckdb.DuckDBPyConnection,
+    day: str,
+    change_rate: float,
 ) -> None:
-    """
-    Test cases with shop restriction and different change rates
-    for different days.
-    """
+    """Test cases with shop restriction and different change rates for different days."""
     check = RelCountChangeCheck(
         database_accessor="",
         database_provider=None,
@@ -129,10 +130,7 @@ def test_rel_count_change_check_no_current_data(duckdb_client: duckdb.DuckDBPyCo
 
 
 def test_rel_count_change_check_no_shop_filter(duckdb_client: duckdb.DuckDBPyConnection) -> None:
-    """
-    Test cases without shop restriction, with history leading
-    to a decreasing number of rows.
-    """
+    """Test cases without shop restriction, with history leading to a decreasing row count."""
     check = RelCountChangeCheck(
         database_accessor="",
         database_provider=None,

@@ -1,3 +1,5 @@
+"""Pydantic models for koality configuration validation."""
+
 from dataclasses import dataclass
 from typing import Literal, Self
 
@@ -6,6 +8,8 @@ from pydantic import BaseModel, Field, computed_field, confloat, conint, model_v
 
 @dataclass
 class DatabaseProvider:
+    """Data class representing a DuckDB database provider connection."""
+
     database_name: str
     database_oid: int
     path: str
@@ -82,8 +86,6 @@ class _GlobalDefaults(_Defaults):
 
 class _Check(_LocalDefaults):
     """Base model for all check configurations."""
-
-    pass
 
 
 class _SingleTableCheck(_Check):
@@ -171,15 +173,18 @@ class _MatchRateCheck(_Check):
     @model_validator(mode="after")
     def validate_join_columns(self) -> Self:
         if not (self.join_columns or (self.join_columns_left and self.join_columns_right)):
-            raise ValueError(
-                "No join_columns provided. Use either join_columns or join_columns_left and join_columns_right"
+            msg = "No join_columns provided. Use either join_columns or join_columns_left and join_columns_right"
+            raise ValueError(msg)
+        if (
+            self.join_columns_left
+            and self.join_columns_right
+            and len(self.join_columns_left) != len(self.join_columns_right)
+        ):
+            msg = (
+                f"join_columns_left and join_columns_right must have equal length "
+                f"({len(self.join_columns_left)} vs. {len(self.join_columns_right)})"
             )
-        if self.join_columns_left and self.join_columns_right:
-            if len(self.join_columns_left) != len(self.join_columns_right):
-                raise ValueError(
-                    f"join_columns_left and join_columns_right must have equal length "
-                    f"({len(self.join_columns_left)} vs. {len(self.join_columns_right)})"
-                )
+            raise ValueError(msg)
         return self
 
 
@@ -208,6 +213,8 @@ class _CheckBundle(BaseModel):
 
 
 class Config(BaseModel):
+    """Root configuration model for koality check execution."""
+
     name: str
     database_setup: str
     database_accessor: str
