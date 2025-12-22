@@ -71,9 +71,9 @@ dev = [
     "ruff>=0.2.1",
     "types-pyyaml>=6.0.12.11",
     "zizmor>=1.2.2",
-    "creosote>=4.0.0",
     "pip-audit>=2.7.3",
     "poethepoet>=0.37.0",
+    "deptry>=0.24.0",
 ]
 
 docs = [
@@ -119,7 +119,7 @@ lint = [
 ]
 # Security and dependency checks.
 check_vulnerable_dependencies = "pip-audit"
-check_unused_dependencies = "creosote"
+check_unused_dependencies = "deptry src/koality"
 check_githubactions = "zizmor .github/workflows/"
 # Testing.
 test_unit = "pytest -m unit"
@@ -135,6 +135,5 @@ koality = "koality.cli:cli"
 requires = ["uv_build>=0.8.15,<0.9.0"]
 build-backend = "uv_build"
 
-[tool.creosote]
-paths = ["koality"]
-exclude-deps = []
+[tool.deptry]
+known_first_party = ["koality"]
