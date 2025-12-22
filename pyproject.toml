@@ -71,9 +71,9 @@ dev = [
     "ruff>=0.2.1",
     "types-pyyaml>=6.0.12.11",
     "zizmor>=1.2.2",
-    "pip-audit>=2.7.3",
     "poethepoet>=0.37.0",
     "deptry>=0.24.0",
+    "uv-secure>=0.15.2",
 ]
 
 docs = [
@@ -118,7 +118,7 @@ lint = [
     { cmd = "ruff check" },
 ]
 # Security and dependency checks.
-check_vulnerable_dependencies = "pip-audit"
+check_vulnerable_dependencies = "uv-secure"
 check_unused_dependencies = "deptry src/koality"
 check_githubactions = "zizmor .github/workflows/"
 # Testing.

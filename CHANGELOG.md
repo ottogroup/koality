@@ -38,6 +38,7 @@ Types of changes:
 ### Changed
 
 - Replace `creosote` with `deptry` for unused dependency checking
+- Replace `pip-audit` with `uv-secure` for vulnerability checking
 - Add missing type hints and migrate Optional/Union to modern union syntax
 - **BREAKING**: CLI now uses subcommands. Previous `koality --config_path <file>` is now `koality run --config_path <file>`
 - **BREAKING**: Check class constructors now use explicit parameters instead of `**kwargs` for `filters`, `identifier_format`, `date_info`, `extra_info`, and `monitor_only`
