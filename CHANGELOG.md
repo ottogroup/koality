@@ -42,6 +42,10 @@ Types of changes:
 - **BREAKING**: Check class constructors now use explicit parameters instead of `**kwargs` for `filters`, `identifier_format`, `date_info`, `extra_info`, and `monitor_only`
 - **BREAKING**: Reordered keyword-only parameters in check classes: `filters`, `identifier_format`, `date_info`, `extra_info`, `monitor_only` (monitor_only is now last)
 
+### Removed
+
+- Remove dynamic CLI argument parsing (`parse_arg` utility and extra args support in `run` command)
+
 ## [0.1.0] - 2025-12-09
 
 ### Added

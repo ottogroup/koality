@@ -24,7 +24,6 @@ from pydantic_yaml import parse_yaml_raw_as
 
 from koality.executor import CheckExecutor
 from koality.models import Config
-from koality.utils import parse_arg
 
 
 @click.group()
@@ -36,15 +35,14 @@ def cli() -> None:
     """
 
 
-@cli.command(context_settings={"ignore_unknown_options": True, "allow_extra_args": True})
+@cli.command()
 @click.option(
     "--config_path",
     required=True,
     type=click.Path(exists=True, dir_okay=False),
     help="Path to the YAML configuration file.",
 )
-@click.pass_context
-def run(ctx: click.Context, config_path: Path) -> None:
+def run(config_path: Path) -> None:
     """Run koality checks from a configuration file.
 
     Executes all data quality checks defined in the configuration file.
@@ -54,14 +52,8 @@ def run(ctx: click.Context, config_path: Path) -> None:
         koality run --config_path checks.yaml
 
     """
-    kwargs = {ctx.args[i].lstrip("-"): ctx.args[i + 1] for i in range(0, len(ctx.args), 2)}
-
-    for key, val in kwargs.items():
-        kwargs[key] = parse_arg(val)
-
     config = parse_yaml_raw_as(Config, Path(config_path).read_text())
-
-    check_executor = CheckExecutor(config=config, **kwargs)
+    check_executor = CheckExecutor(config=config)
     _ = check_executor()
 
 
