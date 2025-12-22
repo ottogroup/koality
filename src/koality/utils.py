@@ -62,17 +62,16 @@ def execute_query(
             query_upper = query.strip().upper()
             is_write_operation = query_upper.startswith(("INSERT", "CREATE", "UPDATE", "DELETE", "DROP", "ALTER"))
 
-            # Need to escape single quotes in the query
-            escaped_query = query.replace("'", "\\'")
             # path -> google cloud project
             project = database_provider.path
 
+            # Use dollar-quoting to avoid escaping issues with single quotes in the query
             if is_write_operation:
                 # Use bigquery_execute for write operations
-                wrapped_query = f"CALL bigquery_execute('{project}', '{escaped_query}')"
+                wrapped_query = f"CALL bigquery_execute('{project}', $bq${query}$bq$)"
             else:
                 # Use bigquery_query for read operations (supports views)
-                wrapped_query = f"SELECT * FROM bigquery_query('{project}', '{escaped_query}')"  # noqa: S608
+                wrapped_query = f"SELECT * FROM bigquery_query('{project}', $bq${query}$bq$)"  # noqa: S608
 
             return duckdb_client.query(wrapped_query)
         log.info("Database is of type '%s'. Using standard query execution.", database_provider.type)

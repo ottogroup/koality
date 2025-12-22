@@ -36,17 +36,18 @@ def test_message_no_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None
         database_provider=None,
         table="dummy_table",
         check_column="*",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=1000,
         upper_threshold=9999,
     )
     check(duckdb_client)
 
     assert check.message == (
-        "SHOP001: Metric row_count failed on 2023-01-01 for dummy_table. Value 99.0000 is not between 1000 and 9999."
+        "shop_code=SHOP001: Metric row_count failed on 2023-01-01 for dummy_table. "
+        "Value 99.0000 is not between 1000 and 9999."
     )
 
 
@@ -57,10 +58,10 @@ def test_message_date_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="*",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=1000,
         upper_threshold=9999,
         date_info="PREDICTION_DATE = real date + 1",
@@ -68,7 +69,7 @@ def test_message_date_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check(duckdb_client)
 
     assert check.message == (
-        "SHOP001: Metric row_count failed on 2023-01-01 "
+        "shop_code=SHOP001: Metric row_count failed on 2023-01-01 "
         "(PREDICTION_DATE = real date + 1) for dummy_table. Value 99.0000 is not between 1000 and 9999."
     )
 
@@ -80,10 +81,10 @@ def test_message_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="*",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=1000,
         upper_threshold=9999,
         extra_info="Note: This is an awesome check.",
@@ -91,7 +92,7 @@ def test_message_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
     check(duckdb_client)
 
     assert check.message == (
-        "SHOP001: Metric row_count failed on 2023-01-01 for dummy_table. "
+        "shop_code=SHOP001: Metric row_count failed on 2023-01-01 for dummy_table. "
         "Value 99.0000 is not between 1000 and 9999. Note: This is an awesome check."
     )
 
@@ -117,10 +118,10 @@ def test_message_correct_formatting() -> None:
         database_provider=None,
         table="dummy_table",
         check_column="value",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=1,
         upper_threshold=1,
     )
@@ -128,5 +129,72 @@ def test_message_correct_formatting() -> None:
 
     # NullRatioCheck returns 0.0 since no nulls exist
     assert check.message == (
-        "SHOP001: Metric value_null_ratio failed on 2023-01-01 for dummy_table. Value 0.0000 is not between 1 and 1."
+        "shop_code=SHOP001: Metric value_null_ratio failed on 2023-01-01 for dummy_table. "
+        "Value 0.0000 is not between 1 and 1."
     )
+
+
+def test_identifier_format_filter_name(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test identifier_format='filter_name' uses filter name as column and value as-is."""
+    check = CountCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="*",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+        identifier_format="filter_name",
+    )
+    result = check(duckdb_client)
+
+    # With filter_name format: column is SHOP_ID, value is SHOP001
+    assert "SHOP_ID" in result
+    assert result["SHOP_ID"] == "SHOP001"
+    assert check.identifier == "SHOP001"
+    assert check.identifier_column == "SHOP_ID"
+
+
+def test_identifier_format_column_name(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test identifier_format='column_name' uses database column name as column header."""
+    check = CountCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="*",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+        identifier_format="column_name",
+    )
+    result = check(duckdb_client)
+
+    # With column_name format: column is SHOP_CODE, value is SHOP001
+    assert "SHOP_CODE" in result
+    assert result["SHOP_CODE"] == "SHOP001"
+    assert check.identifier == "SHOP001"
+    assert check.identifier_column == "SHOP_CODE"
+
+
+def test_identifier_format_identifier_default(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test default identifier_format='identifier' uses column=value format."""
+    check = CountCheck(
+        database_accessor="",
+        database_provider=None,
+        table="dummy_table",
+        check_column="*",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+        # identifier_format defaults to "identifier"
+    )
+    result = check(duckdb_client)
+
+    # With identifier format: column is IDENTIFIER, value is shop_code=SHOP001
+    assert "IDENTIFIER" in result
+    assert result["IDENTIFIER"] == "shop_code=SHOP001"
+    assert check.identifier == "shop_code=SHOP001"
+    assert check.identifier_column == "IDENTIFIER"

@@ -132,10 +132,10 @@ def test_match_rate_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         right_table="skufeed",
         join_columns=["product_number"],
         check_column="product_number",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # 4 / 5 product_numbers found (SHOP001-9999 not in skufeed on that date)
@@ -151,10 +151,10 @@ def test_match_rate_check_join_via_2(duckdb_client: duckdb.DuckDBPyConnection) -
         right_table="skufeed",
         join_columns=["DATE", "product_number"],
         check_column="product_number",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # 4 / 5 product_numbers found
@@ -171,10 +171,10 @@ def test_match_rate_check_different_join_col_names(duckdb_client_renamed: duckdb
         join_columns_left=["DATE", "product_number_v2"],
         join_columns_right=["DATE", "product_number"],
         check_column="product_number",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client_renamed)
     # 4 / 5 product_numbers found
@@ -199,13 +199,13 @@ def test_match_rate_check_no_data(duckdb_client: duckdb.DuckDBPyConnection, day:
         right_table="skufeed",
         join_columns=["product_number"],
         check_column="product_number",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value=shop,
-        date_filter_column="DATE",
-        date_filter_value=day,
+        filters={
+            "shop_id": {"column": "shop_code", "value": shop, "type": "identifier"},
+            "date": {"column": "DATE", "value": day, "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # No data for this shop/day -> data_exists check
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == day
-    assert result["SHOP_ID"] == shop
+    assert result["IDENTIFIER"] == f"shop_code={shop}"

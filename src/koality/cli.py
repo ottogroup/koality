@@ -53,8 +53,6 @@ def run(ctx: click.Context, config_path: Path) -> None:
     Examples:
         koality run --config_path checks.yaml
 
-        koality run --config_path checks.yaml --date_filter_value 2024-01-01
-
     """
     kwargs = {ctx.args[i].lstrip("-"): ctx.args[i + 1] for i in range(0, len(ctx.args), 2)}
 

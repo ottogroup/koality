@@ -83,11 +83,11 @@ def test_rel_count_change_check_shop_filter(
         database_provider=None,
         table="dummy_table",
         check_column="product_number",
-        shop_id_filter_column="shop_id",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value=day,
         rolling_days=2,
+        filters={
+            "date": {"column": "DATE", "value": day, "type": "date"},
+            "shop_id": {"column": "shop_id", "value": "SHOP001", "type": "identifier"},
+        },
     )
     result = check(duckdb_client)
     assert result["VALUE"] == change_rate
@@ -100,11 +100,11 @@ def test_rel_count_change_check_no_history(duckdb_client: duckdb.DuckDBPyConnect
         database_provider=None,
         table="dummy_table",
         check_column="product_number",
-        shop_id_filter_column="shop_id",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2022-12-31",
         rolling_days=2,
+        filters={
+            "date": {"column": "DATE", "value": "2022-12-31", "type": "date"},
+            "shop_id": {"column": "shop_id", "value": "SHOP001", "type": "identifier"},
+        },
     )
     result = check(duckdb_client)
     # No history data -> data_exists check or None value
@@ -118,11 +118,11 @@ def test_rel_count_change_check_no_current_data(duckdb_client: duckdb.DuckDBPyCo
         database_provider=None,
         table="dummy_table",
         check_column="product_number",
-        shop_id_filter_column="shop_id",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-04",
         rolling_days=2,
+        filters={
+            "date": {"column": "DATE", "value": "2023-01-04", "type": "date"},
+            "shop_id": {"column": "shop_id", "value": "SHOP001", "type": "identifier"},
+        },
     )
     result = check(duckdb_client)
     assert result["METRIC_NAME"] == "data_exists"
@@ -136,9 +136,10 @@ def test_rel_count_change_check_no_shop_filter(duckdb_client: duckdb.DuckDBPyCon
         database_provider=None,
         table="dummy_table",
         check_column="product_number",
-        date_filter_column="DATE",
-        date_filter_value="2022-12-31",
         rolling_days=2,
+        filters={
+            "date": {"column": "DATE", "value": "2022-12-31", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # (4 - 8) / 8 = -0.5

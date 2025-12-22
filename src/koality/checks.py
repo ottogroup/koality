@@ -3,14 +3,13 @@
 import abc
 import datetime as dt
 import math
-import re
 from collections.abc import Iterable
 from typing import Any, Literal
 
 import duckdb
 
 from koality.exceptions import KoalityError
-from koality.models import DatabaseProvider
+from koality.models import DatabaseProvider, FilterConfig
 from koality.utils import execute_query, parse_date, to_set
 
 FLOAT_PRECISION = 4
@@ -40,9 +39,11 @@ class DataQualityCheck(abc.ABC):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the data quality check with configuration parameters."""
         self.database_accessor = database_accessor
@@ -52,20 +53,47 @@ class DataQualityCheck(abc.ABC):
         self.upper_threshold = upper_threshold
         self.monitor_only = monitor_only
         self.extra_info_string = f" {extra_info}" if extra_info else ""
-        self.date_info_string = f" ({kwargs['date_info']})" if "date_info" in kwargs else ""
+        self.date_info_string = f" ({date_info})" if date_info else ""
 
         self.status = "NOT_EXECUTED"
         self.message: str | None = None
         self.bytes_billed: int = 0
 
-        # for where filter handling
-        self.filters = self.get_filters(kwargs)
+        # Identifier format configuration
+        self.identifier_format = identifier_format
 
-        self.shop_id = self.filters.get("shop_id", {}).get("value", "ALL_SHOPS")
-        self.date_filter_value = self.filters.get("date", {}).get(
-            "value",
-            dt.datetime.now(tz=dt.UTC).date().isoformat(),
-        )
+        # for where filter handling
+        self.filters = self.get_filters(filters or {})
+
+        # Find identifier filter by type and format based on identifier_format setting
+        identifier_filter_result = self.get_identifier_filter(self.filters)
+        if identifier_filter_result:
+            filter_name, filter_config = identifier_filter_result
+            value = filter_config.get("value", "ALL")
+            column = filter_config.get("column", "")
+
+            if self.identifier_format == "identifier":
+                # Format as "column=value"
+                self.identifier = f"{column}={value}" if column else str(value)
+                self.identifier_column = "IDENTIFIER"
+            elif self.identifier_format == "filter_name":
+                # Use filter name as column, value as-is
+                self.identifier = str(value)
+                self.identifier_column = filter_name.upper()
+            else:  # column_name
+                # Use database column name as column, value as-is
+                self.identifier = str(value)
+                self.identifier_column = column.upper() if column else "IDENTIFIER"
+        else:
+            self.identifier = "ALL"
+            self.identifier_column = "IDENTIFIER"
+
+        # Find date filter by type and store the filter dict
+        date_filter_result = self.get_date_filter(self.filters)
+        if date_filter_result:
+            self.date_filter = date_filter_result[1]
+        else:
+            self.date_filter = None
 
         if check_column is None:
             self.check_column = "*"
@@ -93,11 +121,11 @@ class DataQualityCheck(abc.ABC):
         """Assemble and return the name for this check."""
 
     def __repr__(self) -> str:
-        """Return string representation combining shop_id and check name."""
-        if not hasattr(self, "shop_id"):
+        """Return string representation combining identifier and check name."""
+        if not hasattr(self, "identifier"):
             return self.name
 
-        return f"{self.shop_id}_{self.name}"
+        return f"{self.identifier}_{self.name}"
 
     def data_check(self, duckdb_client: duckdb.DuckDBPyConnection) -> dict:
         """Check if database tables used in the actual check contain data.
@@ -130,13 +158,13 @@ class DataQualityCheck(abc.ABC):
         if not is_empty_table:
             return {}
 
-        date = self.date_filter_value if hasattr(self, "date_filter_value") else dt.datetime.now(tz=dt.UTC).isoformat()
-        self.message = f"No data in {empty_table} on {date} for: {self.shop_id}"
+        date = self.date_filter["value"] if self.date_filter else dt.datetime.now(tz=dt.UTC).date().isoformat()
+        self.message = f"No data in {empty_table} on {date} for: {self.identifier}"
         self.status = "FAIL"
         return {
             "DATE": date,
             "METRIC_NAME": "data_exists",
-            "SHOP_ID": self.shop_id,
+            self.identifier_column: self.identifier,
             "TABLE": empty_table,
         }
 
@@ -175,18 +203,18 @@ class DataQualityCheck(abc.ABC):
         check_value = float(check_value) if check_value is not None else None
         if error:
             result = "ERROR"
-            self.message = f"{self.shop_id}: Metric {self.name} query errored with {error}"
+            self.message = f"{self.identifier}: Metric {self.name} query errored with {error}"
         elif self.monitor_only:
             result = "MONITOR_ONLY"
         else:
             success = check_value is not None and self.lower_threshold <= check_value <= self.upper_threshold
             result = "SUCCESS" if success else "FAIL"
 
-        date = self.date_filter_value
+        date = self.date_filter["value"] if self.date_filter else dt.datetime.now(tz=dt.UTC).date().isoformat()
         result_dict = {
             "DATE": date,
             "METRIC_NAME": self.name,
-            "SHOP_ID": self.shop_id,
+            self.identifier_column: self.identifier,
             "TABLE": self.table,
             "COLUMN": self.check_column,
             "VALUE": check_value,
@@ -198,7 +226,7 @@ class DataQualityCheck(abc.ABC):
         if result_dict["RESULT"] == "FAIL":
             value_string = f"{result_dict['VALUE']:.{FLOAT_PRECISION}f}" if result_dict["VALUE"] is not None else "NULL"
             self.message = (
-                f"{self.shop_id}: Metric {self.name} failed on {self.date_filter_value}{self.date_info_string} "
+                f"{self.identifier}: Metric {self.name} failed on {date}{self.date_info_string} "
                 f"for {self.table}. Value {value_string} is not between {self.lower_threshold} and "
                 f"{self.upper_threshold}.{self.extra_info_string}"
             )
@@ -216,40 +244,127 @@ class DataQualityCheck(abc.ABC):
         return self.check(duckdb_client)
 
     @staticmethod
-    def get_filters(
-        kwargs: dict[str, Any],
-        filter_col_suffix: str = r"_filter_column",
-        filter_value_suffix: str = "_filter_value",
-    ) -> dict[str, dict[str, Any]]:
-        """Generate a filter dict from kwargs using a regex pattern.
+    def get_filters(filters_config: dict[str, Any]) -> dict[str, dict[str, Any]]:
+        """Generate a filter dict from filter configurations.
 
-        Returns a dict of the format
-            {"date": {"column": "date", "value": "2020-01-01"}, ...}
+        Args:
+            filters_config: Dictionary containing filter configurations.
+
+        Example YAML:
+            filters:
+              partition_date:
+                column: BQ_PARTITIONTIME
+                value: yesterday
+                type: date  # auto-parses value as date
+                offset: 0   # optional days offset
+              shop_id:
+                column: shopId
+                value: EC0601
+                type: identifier
+              revenue:
+                column: total_revenue
+                value: 1000
+                operator: ">="
+              category:
+                column: category
+                value: ["toys", "electronics"]
+                operator: "IN"
+
+        Returns:
+            A dict of the format:
+                {"partition_date": {"column": "DATE", "value": "2020-01-01", "operator": "=", "type": "date"}, ...}
+
         """
-        filters = {}
+        filters: dict[str, dict[str, Any]] = {}
 
-        # first, get all filter cols that are marked with filter_col_suffix,
-        # e.g. shop_filter_column
-        for key, value in kwargs.items():
-            if match := re.fullmatch(r"(\w+)" + filter_col_suffix, key):
-                filters[match[1]] = {"column": value}  # match[1] = "(\w+)" from above
+        for filter_name, config in filters_config.items():
+            if isinstance(config, FilterConfig):
+                config_dict = config.model_dump()
+            elif isinstance(config, dict):
+                config_dict = config
+            else:
+                config_dict = {"value": config}
 
-        # next, find values for the filters ()
-        for filter_key, filter_val in filters.items():
-            for key, value in kwargs.items():
-                if re.fullmatch(f"{filter_key}{filter_value_suffix}", key):
-                    if filter_key == "date":
-                        filter_val["value"] = parse_date(value, offset_days=kwargs.get("date_offset", 0))
-                    else:
-                        filter_val["value"] = value
+            column = config_dict.get("column")
+            if column is None:
+                continue
 
-                    break  # no need to loop any further
+            value = config_dict.get("value")
+            filter_type = config_dict.get("type", "other")
 
-            else:  # no break
-                msg = f"{filter_key}_filter_column has no corresponding value!"
-                raise KoalityError(msg)
+            # Auto-parse date values when type is "date" or parse_as_date is True
+            should_parse = filter_type == "date" or config_dict.get("parse_as_date", False)
+            if should_parse and value is not None:
+                value = parse_date(str(value), offset_days=config_dict.get("offset", 0))
+
+            operator = config_dict.get("operator", "=")
+
+            filters[filter_name] = {
+                "column": column,
+                "value": value,
+                "operator": operator,
+                "type": filter_type,
+            }
 
         return filters
+
+    @staticmethod
+    def get_date_filter(filters: dict[str, dict[str, Any]]) -> tuple[str, dict[str, Any]] | None:
+        """Find the date filter (type='date') from the filters dict.
+
+        Args:
+            filters: The filters dict from get_filters().
+
+        Returns:
+            A tuple of (filter_name, filter_config) if found, None otherwise.
+
+        """
+        for name, config in filters.items():
+            if config.get("type") == "date":
+                return name, config
+        return None
+
+    @staticmethod
+    def get_identifier_filter(filters: dict[str, dict[str, Any]]) -> tuple[str, dict[str, Any]] | None:
+        """Find the identifier filter (type='identifier') from the filters dict.
+
+        Args:
+            filters: The filters dict from get_filters().
+
+        Returns:
+            A tuple of (filter_name, filter_config) if found, None otherwise.
+
+        """
+        for name, config in filters.items():
+            if config.get("type") == "identifier":
+                return (name, config)
+        return None
+
+    @staticmethod
+    def _format_filter_value(
+        value: str | float | list | tuple | set,
+        operator: str,
+    ) -> str:
+        """Format a filter value for SQL based on the operator.
+
+        Args:
+            value: The filter value (can be a single value or list for IN/NOT IN).
+            operator: The SQL operator being used.
+
+        Returns:
+            Formatted SQL value string.
+
+        """
+        if operator in ("IN", "NOT IN"):
+            if isinstance(value, (list, tuple, set)):
+                formatted_values = ", ".join(f"'{v}'" for v in value)
+                return f"({formatted_values})"
+            return f"('{value}')"
+
+        if isinstance(value, (int, float)) and not isinstance(value, bool):
+            return str(value)
+
+        return f"'{value}'"
 
     @staticmethod
     def assemble_where_statement(filters: dict[str, dict[str, Any]]) -> str:
@@ -258,27 +373,54 @@ class DataQualityCheck(abc.ABC):
         Args:
             filters: A dict containing filter specifications, e.g.,
                 `{
-                    'shop_id': {
+                    'identifier': {
                         'column': 'shop_code',
-                        'value': 'SHOP01'
+                        'value': 'SHOP01',
+                        'operator': '=',
+                        'type': 'identifier'
                     },
                     'date': {
                         'column': 'date',
-                        'value': '2023-01-01'
+                        'value': '2023-01-01',
+                        'operator': '=',
+                        'type': 'date'
+                    },
+                    'revenue': {
+                        'column': 'total_revenue',
+                        'value': 1000,
+                        'operator': '>='
+                    },
+                    'category': {
+                        'column': 'category',
+                        'value': ['toys', 'electronics'],
+                        'operator': 'IN'
                     }
                 }`
 
         Returns:
             A WHERE statement to restrict the data being used for the check, e.g.,
-            'WHERE shop_code = "SHOP01" AND date = "2023-01-01"'
+            'WHERE shop_code = 'SHOP01' AND date = '2023-01-01' AND total_revenue >= 1000'
 
         """
         if len(filters) == 0:
             return ""
 
-        filters_statements = [
-            4 * " " + f"{filter_dict['column']} = '{filter_dict['value']}'" for _, filter_dict in filters.items()
-        ]
+        filters_statements = []
+        for filter_dict in filters.values():
+            column = filter_dict["column"]
+            value = filter_dict["value"]
+            operator = filter_dict.get("operator", "=")
+
+            # Handle NULL values with IS NULL / IS NOT NULL
+            if value is None:
+                if operator == "!=":
+                    filters_statements.append(f"    {column} IS NOT NULL")
+                else:
+                    filters_statements.append(f"    {column} IS NULL")
+                continue
+
+            formatted_value = DataQualityCheck._format_filter_value(value, operator)
+            filters_statements.append(f"    {column} {operator} {formatted_value}")
 
         return "WHERE\n" + "\nAND\n".join(filters_statements)
 
@@ -307,9 +449,11 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the column transformation check."""
         self.transformation_name = transformation_name
@@ -321,9 +465,11 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def assemble_name(self) -> str:
@@ -378,10 +524,10 @@ class NullRatioCheck(ColumnTransformationCheck):
         database_provider=None,
         table="project.dataset.table",
         check_column="orders",
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="date",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+            "date": {"column": "date", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
@@ -397,9 +543,11 @@ class NullRatioCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the null ratio check."""
         super().__init__(
@@ -410,9 +558,11 @@ class NullRatioCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -441,8 +591,7 @@ class RegexMatchCheck(ColumnTransformationCheck):
         table="project.dataset.table",
         check_column="orders",
         regex_to_match="^SHOP[0-9]{2}-.*",
-        date_filter_column="date",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={"date": {"column": "date", "value": "2023-01-01", "type": "date"}},
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
@@ -459,9 +608,11 @@ class RegexMatchCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the regex match check."""
         self.regex_to_match = regex_to_match
@@ -474,9 +625,11 @@ class RegexMatchCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -503,10 +656,10 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         table="project.dataset.table",
         check_column="category",
         value_set='("toys", "shoes")',
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="date",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+            "date": {"column": "date", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
@@ -526,7 +679,9 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         monitor_only: bool = False,
         transformation_name: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
     ) -> None:
         """Initialize the values in set check."""
         self.value_set = to_set(value_set)
@@ -543,9 +698,11 @@ class ValuesInSetCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -562,6 +719,9 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
     `koality.checks.ColumnTransformationCheck`, so we refer to argument descriptions
     in its super class.
 
+    Args:
+        filters: Filter configuration dict. Must include a 'date' filter with column and value.
+
     Example:
     RollingValuesInSetCheck(
         database_accessor="my-gcp-project.SHOP01",
@@ -569,10 +729,10 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         table="my-gcp-project.SHOP01.orders",
         check_column="category",
         value_set='("toys", "shoes")',
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="DATE",  # mandatory
-        date_filter_value="2023-01-01",  # mandatory
+        filters={
+            "partition_date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+        },
         lower_threshold=0.9,
         upper_threshold=1.0,
     )
@@ -586,18 +746,28 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
         table: str,
         check_column: str,
         value_set: str | bytes | Iterable,
-        date_filter_column: str,
-        date_filter_value: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the rolling values in set check."""
-        self.date_filter_column = date_filter_column
-        self.date_filter_value = date_filter_value
+        # Find date filter by type
+        filters = filters or {}
+        date_filter = None
+        for config in filters.values():
+            cfg = config.model_dump() if isinstance(config, FilterConfig) else config
+            if cfg.get("type") == "date":
+                date_filter = cfg
+                break
+
+        if not date_filter or not date_filter.get("column") or date_filter.get("value") is None:
+            msg = "RollingValuesInSetCheck requires a filter with type='date'"
+            raise KoalityError(msg)
 
         super().__init__(
             database_accessor=database_accessor,
@@ -608,24 +778,25 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
-            date_filter_value=date_filter_value,
-            date_filter_column=date_filter_column,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
-        self.filters = {
-            filter_name: filer_dict for filter_name, filer_dict in self.filters.items() if filter_name != "date"
-        }
+        # Remove date filter from WHERE clause (it's used in the rolling window SQL, not WHERE)
+        self.filters = {name: cfg for name, cfg in self.filters.items() if cfg.get("type") != "date"}
 
     def assemble_query(self) -> str:
         """Assemble query with rolling date range for values in set check."""
         main_query = self.query_boilerplate(self.transformation_statement())
+        date_col = self.date_filter["column"]
+        date_val = self.date_filter["value"]
 
         main_query += (
             "WHERE\n    "
-            f"{self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL 14 DAY) AND '{self.date_filter_value}'"  # noqa: E501
+            f"{date_col} BETWEEN (DATE '{date_val}' - INTERVAL 14 DAY) AND '{date_val}'"
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -645,10 +816,10 @@ class DuplicateCheck(ColumnTransformationCheck):
         database_provider=None,
         table="my-gcp-project.SHOP01.skufeed_latest",
         check_column="sku_id",
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="DATE",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=0.0,
         upper_threshold=0.0,
     )
@@ -664,9 +835,11 @@ class DuplicateCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the duplicate check."""
         super().__init__(
@@ -677,9 +850,11 @@ class DuplicateCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -706,10 +881,10 @@ class CountCheck(ColumnTransformationCheck):
         table="my-gcp-project.SHOP01.skufeed_latest",
         check_column="sku_id",
         distinct=True,
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="DATE",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=10000.0,
         upper_threshold=99999.0,
     )
@@ -726,9 +901,11 @@ class CountCheck(ColumnTransformationCheck):
         upper_threshold: float = math.inf,
         *,
         distinct: bool = False,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the count check."""
         if check_column == "*" and distinct:
@@ -745,9 +922,11 @@ class CountCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -780,9 +959,11 @@ class AverageCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the average check."""
         super().__init__(
@@ -793,9 +974,11 @@ class AverageCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -818,9 +1001,11 @@ class MaxCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the max check."""
         super().__init__(
@@ -831,9 +1016,11 @@ class MaxCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -856,9 +1043,11 @@ class MinCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the min check."""
         super().__init__(
@@ -869,9 +1058,11 @@ class MinCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -898,10 +1089,10 @@ class OccurrenceCheck(ColumnTransformationCheck):
         max_or_min="max",
         table="my-gcp-project.SHOP01.skufeed_latest",
         check_column="sku_id",
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="DATE",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         lower_threshold=0,
         upper_threshold=500,
     )
@@ -918,9 +1109,11 @@ class OccurrenceCheck(ColumnTransformationCheck):
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the occurrence check."""
         if max_or_min not in ("max", "min"):
@@ -935,9 +1128,11 @@ class OccurrenceCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
     def transformation_statement(self) -> str:
@@ -989,10 +1184,16 @@ class MatchRateCheck(DataQualityCheck):
         join_columns_left=["DATE", "product_number_v2"],
         join_columns_right=["DATE", "product_number"],
         check_column="product_number",
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="DATE",  # optional
-        date_filter_value="2023-01-01",  # optional
+        filters={
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+        filters_left={
+            "status": {"column": "order_status", "value": "completed"},
+        },
+        filters_right={
+            "active": {"column": "is_active", "value": True},
+        },
     )
 
     """
@@ -1012,7 +1213,11 @@ class MatchRateCheck(DataQualityCheck):
         *,
         monitor_only: bool = False,
         extra_info: str | None = None,
-        **kwargs: object,
+        filters: dict[str, Any] | None = None,
+        filters_left: dict[str, Any] | None = None,
+        filters_right: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
     ) -> None:
         """Initialize the match rate check."""
         self.left_table = left_table
@@ -1045,13 +1250,16 @@ class MatchRateCheck(DataQualityCheck):
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
-        self.filters_left = self.filters | self.get_filters(kwargs, filter_col_suffix="filter_column_left")
-        self.filters_right = self.filters | self.get_filters(kwargs, filter_col_suffix="filter_column_right")
+        # Support table-specific filters via filters_left and filters_right
+        self.filters_left = self.filters | self.get_filters(filters_left or {})
+        self.filters_right = self.filters | self.get_filters(filters_right or {})
 
     def assemble_name(self) -> str:
         """Return the check name for match rate."""
@@ -1144,12 +1352,11 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         check_column: Name of column to be checked (e.g., "category")
         rolling_days: The number of historic days to be taken into account for
                       the historic average baseline for the comparison (e.g., 7).
-        date_filter_column: The name of the date column
-        date_filter_value: The date where the check should be performed (e.g., "2023-01-01")
         lower_threshold: Check will fail if check result < lower_threshold
         upper_threshold: Check will fail if check result > upper_threshold
         monitor_only: If True, no checks will be performed
         extra_info: Optional additional text that will be added to the end of the failure message
+        filters: Filter configuration dict. Must include a 'date' filter with column and value.
 
     Example:
     RelCountChangeCheck(
@@ -1158,10 +1365,10 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         table="my-gcp-project.SHOP01.skufeed_latest",
         check_column="sku_id",
         rolling_days=7,
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
-        date_filter_column="DATE",  # mandatory
-        date_filter_value="2023-01-01",  # mandatory
+        filters={
+            "partition_date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+        },
         lower_threshold=-0.15,
         upper_threshold=0.15,
     )
@@ -1175,19 +1382,30 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         table: str,
         check_column: str,
         rolling_days: int,
-        date_filter_column: str,
-        date_filter_value: str,
         lower_threshold: float = -math.inf,
         upper_threshold: float = math.inf,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the relative count change check."""
         self.rolling_days = rolling_days
-        self.date_filter_value = date_filter_value
-        self.date_filter_column = date_filter_column
+
+        # Find date filter by type
+        filters = filters or {}
+        date_filter = None
+        for config in filters.values():
+            cfg = config.model_dump() if isinstance(config, FilterConfig) else config
+            if cfg.get("type") == "date":
+                date_filter = cfg
+                break
+
+        if not date_filter or not date_filter.get("column") or date_filter.get("value") is None:
+            msg = "RelCountChangeCheck requires a filter with type='date'"
+            raise KoalityError(msg)
 
         super().__init__(
             database_accessor=database_accessor,
@@ -1196,16 +1414,15 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             check_column=check_column,
             lower_threshold=lower_threshold,
             upper_threshold=upper_threshold,
-            monitor_only=monitor_only,
-            date_filter_column=date_filter_column,
-            date_filter_value=date_filter_value,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
-        self.filters = {
-            filter_name: filer_dict for filter_name, filer_dict in self.filters.items() if filter_name != "date"
-        }
+        # Remove date filter from WHERE clause (it's used in the rolling window SQL, not WHERE)
+        self.filters = {name: cfg for name, cfg in self.filters.items() if cfg.get("type") != "date"}
 
     def assemble_name(self) -> str:
         """Return the check name for count change."""
@@ -1214,21 +1431,23 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
     def assemble_query(self) -> str:
         """Assemble the SQL query for calculating relative count change."""
         where_statement = self.assemble_where_statement(self.filters).replace("WHERE", "AND")
+        date_col = self.date_filter["column"]
+        date_val = self.date_filter["value"]
 
         return f"""
         WITH
             base AS (
                 SELECT
-                    {self.date_filter_column},
+                    {date_col},
                     COUNT(DISTINCT {self.check_column}) AS dist_cnt
                 FROM
                     {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
                 WHERE
-                    {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
-                    AND '{self.date_filter_value}'
+                    {date_col} BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
+                    AND '{date_val}'
                 {where_statement}
                 GROUP BY
-                    {self.date_filter_column}
+                    {date_col}
             ),
             rolling_avgs AS (
                 SELECT
@@ -1236,9 +1455,9 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
                 FROM
                     base
                 WHERE
-                    {self.date_filter_column} BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.rolling_days} DAY)
+                    {date_col} BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
                 AND
-                    (DATE '{self.date_filter_value}' - INTERVAL 1 DAY)
+                    (DATE '{date_val}' - INTERVAL 1 DAY)
             ),
 
             -- Helper is needed to cover case where no current data is available
@@ -1247,7 +1466,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
                     MAX(dist_cnt) AS dist_cnt
                 FROM
                     (
-                        SELECT dist_cnt FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
+                        SELECT dist_cnt FROM base WHERE {date_col} = '{date_val}'
                         UNION ALL
                         SELECT 0 AS dist_cnt
                     )
@@ -1263,7 +1482,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             JOIN
                 rolling_avgs
             ON TRUE
-        """  # noqa: E501
+        """
 
     def assemble_data_exists_query(self) -> str:
         """Assemble the SQL query to check if data exists for the check date."""
@@ -1273,24 +1492,31 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         FROM
             {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
         """
+        date_col = self.date_filter["column"]
+        date_val = self.date_filter["value"]
 
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            return f"{data_exists_query}\n{where_statement} AND {self.date_filter_column} = '{self.date_filter_value}'"
-        return f"{data_exists_query}\nWHERE {self.date_filter_column} = '{self.date_filter_value}'"
+            return f"{data_exists_query}\n{where_statement} AND {date_col} = '{date_val}'"
+        return f"{data_exists_query}\nWHERE {date_col} = '{date_val}'"
 
 
 class IqrOutlierCheck(ColumnTransformationCheck):
     """Check if a column value is an outlier based on the interquartile range (IQR) method.
 
     Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to
-    argument descriptions in its super class, except for the `date` and `date_filter_column`
-    arguments which are added in this subclass.
+    argument descriptions in its super class.
 
     The IQR method is based on the 25th and 75th percentiles of the data. The
     thresholds are calculated as follows:
         - lower_threshold = q25 - iqr_factor * (q75 - q25)
         - upper_threshold = q75 + iqr_factor * (q75 - q25)
+
+    Args:
+        filters: Filter configuration dict. Must include a filter with type='date'.
+        interval_days: Number of historic days to use for IQR calculation.
+        how: Check mode - 'both', 'upper', or 'lower' outliers.
+        iqr_factor: Multiplier for IQR range (minimum 1.5).
 
     Example:
     IqrOutlierCheck(
@@ -1298,13 +1524,13 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         database_provider=None,
         check_column="num_orders",
         table="my-gcp-project.SHOP01.orders",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
         interval_days=14,
-        how="both",  # check both upper and lower outliers
+        how="both",
         iqr_factor=1.5,
-        shop_id_filter_column="shop_code",  # optional
-        shop_id_filter_value="SHOP01",  # optional
+        filters={
+            "partition_date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+            "identifier": {"column": "shop_code", "value": "SHOP01", "type": "identifier"},
+        },
     )
 
     """
@@ -1317,19 +1543,30 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         database_provider: DatabaseProvider | None,
         check_column: str,
         table: str,
-        date_filter_column: str,
-        date_filter_value: str,
         interval_days: int,
         how: Literal["both", "upper", "lower"],
         iqr_factor: float,
         *,
-        monitor_only: bool = False,
+        filters: dict[str, Any] | None = None,
+        identifier_format: str = "identifier",
+        date_info: str | None = None,
         extra_info: str | None = None,
-        **kwargs: object,
+        monitor_only: bool = False,
     ) -> None:
         """Initialize the IQR outlier check."""
-        self.date_filter_column = date_filter_column
-        self.date_filter_value = date_filter_value
+        # Find date filter by type
+        filters = filters or {}
+        date_filter = None
+        for config in filters.values():
+            cfg = config.model_dump() if isinstance(config, FilterConfig) else config
+            if cfg.get("type") == "date":
+                date_filter = cfg
+                break
+
+        if not date_filter or not date_filter.get("column") or date_filter.get("value") is None:
+            msg = "IqrOutlierCheck requires a filter with type='date'"
+            raise KoalityError(msg)
+
         if interval_days < 1:
             msg = "interval_days must be at least 1"
             raise KoalityError(msg)
@@ -1352,16 +1589,15 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             check_column=check_column,
             lower_threshold=-math.inf,
             upper_threshold=math.inf,
-            monitor_only=monitor_only,
+            filters=filters,
+            identifier_format=identifier_format,
+            date_info=date_info,
             extra_info=extra_info,
-            date_filter_column=date_filter_column,
-            date_filter_value=date_filter_value,
-            **kwargs,
+            monitor_only=monitor_only,
         )
 
-        self.filters = {
-            filter_name: filer_dict for filter_name, filer_dict in self.filters.items() if filter_name != "date"
-        }
+        # Remove date filter from WHERE clause (it's used in the interval SQL, not WHERE)
+        self.filters = {name: cfg for name, cfg in self.filters.items() if cfg.get("type") != "date"}
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for IQR-based outlier detection."""
@@ -1370,6 +1606,9 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         #       IQR calculation
         where_statement = ""
         filter_columns = ""
+        date_col = self.date_filter["column"]
+        date_val = self.date_filter["value"]
+
         if self.filters:
             filter_columns = ",\n".join([v["column"] for v in self.filters.values()])
             filter_columns = ",\n" + filter_columns
@@ -1379,21 +1618,21 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         WITH
             base AS (
                 SELECT
-                    DATE({self.date_filter_column}) AS {self.date_filter_column},
+                    DATE({date_col}) AS {date_col},
                     {self.check_column}
                     {filter_columns}
                 FROM
                     {self.table}
                 WHERE
-                    DATE({self.date_filter_column}) BETWEEN (DATE '{self.date_filter_value}' - INTERVAL {self.interval_days} DAY)
-                    AND DATE '{self.date_filter_value}'
+                    DATE({date_col}) BETWEEN (DATE '{date_val}' - INTERVAL {self.interval_days} DAY)
+                    AND DATE '{date_val}'
                     {where_statement}
             ),
             compare AS (
-                SELECT * FROM base WHERE {self.date_filter_column} < '{self.date_filter_value}'
+                SELECT * FROM base WHERE {date_col} < '{date_val}'
             ),
             slice AS (
-                SELECT * FROM base WHERE {self.date_filter_column} = '{self.date_filter_value}'
+                SELECT * FROM base WHERE {date_col} = '{date_val}'
             ),
             percentiles AS (
                 SELECT
@@ -1413,7 +1652,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                 LEFT JOIN percentiles
                 ON TRUE
             )
-        """  # noqa: E501
+        """
 
     def query_boilerplate(self, metric_statement: str) -> str:
         """Return the query structure for IQR outlier detection."""
@@ -1445,9 +1684,12 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         FROM
             {f"{self.database_accessor}." if self.database_accessor else ""}{self.table}
         """
+        date_col = self.date_filter["column"]
+        date_val = self.date_filter["value"]
+
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            where_statement = f"{where_statement} AND {self.date_filter_column} = '{self.date_filter_value}'"
+            where_statement = f"{where_statement} AND {date_col} = '{date_val}'"
         else:
-            where_statement = f"WHERE {self.date_filter_column} = '{self.date_filter_value}'"
+            where_statement = f"WHERE {date_col} = '{date_val}'"
         return f"{data_exists_query}\n{where_statement}"

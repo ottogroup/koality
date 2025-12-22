@@ -202,7 +202,7 @@ def test_executor_failure(config_file_failure_v2: Path, duckdb_client: duckdb.Du
     check_message = message_file.read_text()
     # SHOP002 has 100 rows but threshold is 0-10, so it should fail
     assert "row_count failed" in check_message
-    assert "ALL_SHOPS" in check_message
+    assert "ALL" in check_message
     assert executor.check_failed is True
 
 
