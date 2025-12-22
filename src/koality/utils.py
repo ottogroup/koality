@@ -110,22 +110,6 @@ def parse_date(date: str, offset_days: int = 0) -> str:
     return (dt.datetime.fromisoformat(date) + dt.timedelta(days=offset_days)).date().isoformat()
 
 
-def parse_arg(arg: str) -> str | int | bool:
-    """Parse a string argument into its appropriate Python type.
-
-    Converts 'true'/'false' to booleans and numeric strings to int/float.
-    """
-    if arg.lower() == "false":
-        return False
-    if arg.lower() == "true":
-        return True
-
-    if re.fullmatch(r"\d+(\.\d+)?", arg):  # if is int or float
-        return literal_eval(arg)
-
-    return arg
-
-
 def to_set(value: object) -> set[object]:
     """Convert the input value to a set.
 

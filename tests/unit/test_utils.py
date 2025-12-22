@@ -4,27 +4,9 @@ import datetime as dt
 
 import pytest
 
-from koality.utils import parse_arg, parse_date, to_set
+from koality.utils import parse_date, to_set
 
 pytestmark = pytest.mark.unit
-
-
-@pytest.mark.parametrize(
-    ("test_input", "expected"),
-    [
-        ("test string", "test string"),
-        ("Cr4zy-str!ng11", "Cr4zy-str!ng11"),
-        ("TRUE", True),
-        ("false", False),
-        ("3.1415", 3.1415),
-        ("1993", 1993),
-        ("0", 0),
-        ("0.0", 0.0),
-    ],
-)
-def test_parse_arg(test_input: str, expected: object) -> None:
-    """Test parse_arg function with various inputs."""
-    assert expected == parse_arg(test_input)
 
 
 @pytest.mark.parametrize(
