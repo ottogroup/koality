@@ -22,10 +22,15 @@ Types of changes:
 - MaxCheck to compute MAX over a column.
 - MinCheck to compute MIN over a column.
 - Lint (almost) all rules
+- CLI subcommands: `run`, `validate`, and `print`
+  - `run`: Execute checks (previously the default behavior)
+  - `validate`: Validate configuration without execution
+  - `print`: Print resolved configuration in model/yaml/json formats with configurable indentation
 
 ### Changed
 
 - Add missing type hints and migrate Optional/Union to modern union syntax
+- **BREAKING**: CLI now uses subcommands. Previous `koality --config_path <file>` is now `koality run --config_path <file>`
 
 ## [0.1.0] - 2025-12-09
 
