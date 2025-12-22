@@ -104,7 +104,39 @@ else:
 ### 3. Run Checks via CLI
 
 ```bash
-koality run checks.yaml
+koality run --config_path checks.yaml
+```
+
+You can override default configuration values via CLI arguments:
+
+```bash
+koality run --config_path checks.yaml --date_filter_value 2024-01-01
+```
+
+### 4. Validate Configuration
+
+Validate your configuration file without executing checks:
+
+```bash
+koality validate --config_path checks.yaml
+```
+
+### 5. Print Resolved Configuration
+
+View the fully resolved configuration (after default propagation) in different formats:
+
+```bash
+# YAML format (default)
+koality print --config_path checks.yaml
+
+# JSON format
+koality print --config_path checks.yaml --format json
+
+# Pydantic model representation
+koality print --config_path checks.yaml --format model
+
+# Custom indentation
+koality print --config_path checks.yaml --format yaml --indent 4
 ```
 
 ## Understanding Check Results
