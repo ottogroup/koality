@@ -220,10 +220,10 @@ def test_null_ratio_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="num_orders",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # 1 out of 4 values is NULL for SHOP001 on 2023-01-01
@@ -237,17 +237,17 @@ def test_null_ratio_check_empty_table(duckdb_client: duckdb.DuckDBPyConnection) 
         database_provider=None,
         table="dummy_table",
         check_column="num_orders",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-02",  # not in dummy_table
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-02", "type": "date"},
+        },  # not in dummy_table
     )
     result = check(duckdb_client)
     # No data for this date, should return data_exists = False
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == "2023-01-02"
     assert result["TABLE"] == "dummy_table"
-    assert result["SHOP_ID"] == "SHOP001"
+    assert result["IDENTIFIER"] == "shop_code=SHOP001"
 
 
 def test_regex_match_check_all_matched(duckdb_client: duckdb.DuckDBPyConnection) -> None:
@@ -257,10 +257,10 @@ def test_regex_match_check_all_matched(duckdb_client: duckdb.DuckDBPyConnection)
         database_provider=None,
         table="dummy_table",
         check_column="product_number",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         regex_to_match=r"SHOP001-\d\d\d\d",  # DuckDB uses single escape
     )
     result = check(duckdb_client)
@@ -275,10 +275,10 @@ def test_regex_match_check_with_unmatched(duckdb_client: duckdb.DuckDBPyConnecti
         database_provider=None,
         table="dummy_table",
         check_column="product_number",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         regex_to_match=r"SHOP001-000\d",  # Matches 0001, 0002, 0003 but not 0040
     )
     result = check(duckdb_client)
@@ -293,10 +293,10 @@ def test_values_in_set_check_value_given(duckdb_client: duckdb.DuckDBPyConnectio
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         value_set='("toys", "furniture")',
     )
     result = check(duckdb_client)
@@ -311,10 +311,10 @@ def test_values_in_set_check_value_not_given(duckdb_client: duckdb.DuckDBPyConne
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         value_set='("weird non-existing value", "another weird value")',
     )
     result = check(duckdb_client)
@@ -338,17 +338,17 @@ def test_values_in_set_check_no_data(duckdb_client: duckdb.DuckDBPyConnection, d
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value=shop,
-        date_filter_column="DATE",
-        date_filter_value=day,
+        filters={
+            "shop_id": {"column": "shop_code", "value": shop, "type": "identifier"},
+            "date": {"column": "DATE", "value": day, "type": "date"},
+        },
         value_set='("toys", "furniture")',
     )
     result = check(duckdb_client)
     # No data for this shop/day -> data_exists = False
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == day
-    assert result["SHOP_ID"] == shop
+    assert result["IDENTIFIER"] == f"shop_code={shop}"
 
 
 def test_values_in_set_check_value_single_value(duckdb_client: duckdb.DuckDBPyConnection) -> None:
@@ -358,10 +358,10 @@ def test_values_in_set_check_value_single_value(duckdb_client: duckdb.DuckDBPyCo
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
         value_set='"toys"',
     )
     result = check(duckdb_client)
@@ -376,10 +376,10 @@ def test_rolling_values_in_set_check_value_given_single_day(duckdb_client: duckd
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-14",
+        filters={
+            "date": {"column": "DATE", "value": "2023-01-14", "type": "date"},
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+        },
         value_set='("toys")',
     )
     result = check(duckdb_client)
@@ -394,10 +394,10 @@ def test_rolling_values_in_set_check_value_given_2_days(duckdb_client: duckdb.Du
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-15",
+        filters={
+            "date": {"column": "DATE", "value": "2023-01-15", "type": "date"},
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+        },
         value_set='("toys")',
     )
     result = check(duckdb_client)
@@ -412,10 +412,10 @@ def test_duplicate_check_duplicates(duckdb_client: duckdb.DuckDBPyConnection) ->
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # 4 total - 3 distinct = 1 duplicate
@@ -429,10 +429,10 @@ def test_duplicate_check_no_duplicates(duckdb_client: duckdb.DuckDBPyConnection)
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP023",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP023", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # Only 1 row for SHOP023, no duplicates
@@ -446,10 +446,10 @@ def test_duplicate_check_no_data(duckdb_client: duckdb.DuckDBPyConnection) -> No
         database_provider=None,
         table="dummy_table",
         check_column="assortment",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP999",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP999", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     assert result["METRIC_NAME"] == "data_exists"
@@ -463,10 +463,10 @@ def test_count_check_regular(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="*",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # 4 rows for SHOP001 on 2023-01-01
@@ -481,10 +481,10 @@ def test_count_check_distinct_column(duckdb_client: duckdb.DuckDBPyConnection) -
         table="dummy_table",
         check_column="assortment",
         distinct=True,
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     # 3 distinct assortment values: toys, furniture, clothing
@@ -507,15 +507,15 @@ def test_count_check_regular_no_data(duckdb_client: duckdb.DuckDBPyConnection, d
         database_provider=None,
         table="dummy_table",
         check_column="*",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value=shop,
-        date_filter_column="DATE",
-        date_filter_value=day,
+        filters={
+            "shop_id": {"column": "shop_code", "value": shop, "type": "identifier"},
+            "date": {"column": "DATE", "value": day, "type": "date"},
+        },
     )
     result = check(duckdb_client)
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == day
-    assert result["SHOP_ID"] == shop
+    assert result["IDENTIFIER"] == f"shop_code={shop}"
 
 
 def test_average_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
@@ -525,10 +525,10 @@ def test_average_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="num_orders",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     assert pytest.approx(result["VALUE"], 1e-6) == (5 + 3 + 0) / 3
@@ -541,10 +541,10 @@ def test_max_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="num_orders",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     assert result["VALUE"] == 5
@@ -557,10 +557,10 @@ def test_min_check(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         database_provider=None,
         table="dummy_table",
         check_column="num_orders",
-        shop_id_filter_column="shop_code",
-        shop_id_filter_value="SHOP001",
-        date_filter_column="DATE",
-        date_filter_value="2023-01-01",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
     )
     result = check(duckdb_client)
     assert result["VALUE"] == 0
@@ -615,11 +615,12 @@ def test_iqr_outlier_check_success(duckdb_client_iqr: duckdb.DuckDBPyConnection)
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr",
-        date_filter_column="BQ_PARTITIONTIME",
-        date_filter_value="2023-01-15",
         interval_days=14,
         how="both",
         iqr_factor=1.5,
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-15", "type": "date"},
+        },
     )
     result = check(duckdb_client_iqr)
     assert result["VALUE"] == 101.0
@@ -636,18 +637,18 @@ def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops: duckdb
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr_two_shops",
-        date_filter_column="BQ_PARTITIONTIME",
-        date_filter_value="2023-01-15",
         interval_days=14,
         how="both",
         iqr_factor=1.5,
-        shop_id_filter_column="SHOP_ID",
-        shop_id_filter_value="abcd",
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-15", "type": "date"},
+            "shop_id": {"column": "SHOP_ID", "value": "abcd", "type": "identifier"},
+        },
     )
     result = check(duckdb_client_iqr_two_shops)
     assert result["VALUE"] == 101.0
     assert result["RESULT"] == "SUCCESS"
-    assert result["SHOP_ID"] == "abcd"
+    assert result["IDENTIFIER"] == "SHOP_ID=abcd"
 
     # Test shop 'efgh'
     check2 = IqrOutlierCheck(
@@ -655,18 +656,18 @@ def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops: duckdb
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr_two_shops",
-        date_filter_value="2023-01-15",
-        date_filter_column="BQ_PARTITIONTIME",
         interval_days=14,
         how="both",
         iqr_factor=1.5,
-        shop_id_filter_column="SHOP_ID",
-        shop_id_filter_value="efgh",
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-15", "type": "date"},
+            "shop_id": {"column": "SHOP_ID", "value": "efgh", "type": "identifier"},
+        },
     )
     result2 = check2(duckdb_client_iqr_two_shops)
     assert result2["VALUE"] == 101.0
     assert result2["RESULT"] == "SUCCESS"
-    assert result2["SHOP_ID"] == "efgh"
+    assert result2["IDENTIFIER"] == "SHOP_ID=efgh"
 
 
 def test_iqr_outlier_check_failure(duckdb_client_iqr: duckdb.DuckDBPyConnection) -> None:
@@ -676,11 +677,12 @@ def test_iqr_outlier_check_failure(duckdb_client_iqr: duckdb.DuckDBPyConnection)
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr",
-        date_filter_value="2023-01-11",
-        date_filter_column="BQ_PARTITIONTIME",
         interval_days=14,
         how="both",
         iqr_factor=1.5,
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-11", "type": "date"},
+        },
     )
 
     result = check(duckdb_client_iqr)
@@ -695,8 +697,9 @@ def test_iqr_outlier_check_success_because_only_lower(duckdb_client_iqr: duckdb.
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr",
-        date_filter_column="BQ_PARTITIONTIME",
-        date_filter_value="2023-01-11",
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-11", "type": "date"},
+        },
         interval_days=14,
         how="lower",
         iqr_factor=1.5,
@@ -722,8 +725,9 @@ def test_iqr_outlier_check_value_error(option: dict[str, object], match: str) ->
         "database_provider": None,
         "check_column": "VALUE",
         "table": "dummy_table_iqr",
-        "date_filter_column": "BQ_PARTITIONTIME",
-        "date_filter_value": "2023-01-11",
+        "filters": {
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-11", "type": "date"},
+        },
         "interval_days": 14,
         "how": "lower",
         "iqr_factor": 1.5,
@@ -739,8 +743,9 @@ def test_iqr_outlier_check_data_exists_error(duckdb_client_iqr_latest_value_miss
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr_latest_value_missing",
-        date_filter_column="BQ_PARTITIONTIME",
-        date_filter_value="2023-01-15",
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2023-01-15", "type": "date"},
+        },
         interval_days=14,
         how="upper",
         iqr_factor=1.5,
@@ -756,8 +761,9 @@ def test_iqr_outlier_check_failure_oven_2024_02_12(duckdb_client_iqr_oven: duckd
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr_oven",
-        date_filter_column="BQ_PARTITIONTIME",
-        date_filter_value="2024-02-12",
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2024-02-12", "type": "date"},
+        },
         interval_days=14,
         how="upper",
         iqr_factor=1.5,
@@ -774,8 +780,9 @@ def test_iqr_outlier_check_failure_oven_2024_02_13(duckdb_client_iqr_oven: duckd
         database_provider=None,
         check_column="VALUE",
         table="dummy_table_iqr_oven",
-        date_filter_column="BQ_PARTITIONTIME",
-        date_filter_value="2024-02-13",
+        filters={
+            "date": {"column": "BQ_PARTITIONTIME", "value": "2024-02-13", "type": "date"},
+        },
         interval_days=14,
         how="upper",
         iqr_factor=1.5,

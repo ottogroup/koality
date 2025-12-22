@@ -97,11 +97,14 @@ dependencies = [
 name: My Data Quality Checks
 
 defaults:
-  date_filter_column: date
-  date: yesterday
   result_table: my_project.dqm.results
   persist_results: true
   log_path: dqm_failures.txt
+  filters:
+    partition_date:
+      column: date
+      value: yesterday
+      type: date
 
 check_bundles:
   - name: null_ratio_checks
@@ -119,7 +122,7 @@ check_bundles:
 ### 2. Run checks via CLI
 
 ```bash
-koality --config_path koality_config.yaml
+koality run --config_path koality_config.yaml
 ```
 
 ### 3. Review results
@@ -136,22 +139,43 @@ Koality uses a hierarchical configuration system where more specific settings ov
 
 ## Filter System
 
-Apply dynamic filters to check specific data subsets:
+Apply dynamic filters to check specific data subsets using the structured `filters` syntax:
 
 ```yaml
 defaults:
-  date_filter_column: created_at
-  date: yesterday
-  shop_id_filter_column: shop_id
-  shop_id: SHOP01
+  filters:
+    partition_date:
+      column: created_at
+      value: yesterday
+      type: date           # Required for rolling checks; auto-parses date values
+    shop_id:
+      column: shop_id
+      value: SHOP01
+      type: identifier     # Marks this as the identifier filter for result grouping
+    revenue:
+      column: total_revenue
+      value: 1000
+      operator: ">="       # Supports =, !=, >, >=, <, <=, IN, NOT IN, LIKE, NOT LIKE
 ```
 
-## Time Magic
+### Filter Properties
 
-Koality supports relative date expressions:
+| Property        | Description                                                                    |
+|-----------------|--------------------------------------------------------------------------------|
+| `column`        | Database column name to filter on (optional in defaults, required after merge) |
+| `value`         | Filter value (optional in defaults, required after merge)                      |
+| `type`          | `date`, `identifier`, or `other` (default). Only one of each type allowed      |
+| `operator`      | SQL operator: `=`, `!=`, `>`, `>=`, `<`, `<=`, `IN`, `NOT IN`, `LIKE`          |
+| `parse_as_date` | If `true`, parse value as date (for non-date-type filters)                     |
+| `offset`        | Days offset for date parsing (e.g., `-1` for yesterday)                        |
 
-- `today`, `yesterday`, `tomorrow`
-- `today-2`, `today+3` (offset by days)
+## Date Parsing
+
+Koality automatically parses date values when `type: date` is set:
+
+- **Relative dates**: `today`, `yesterday`, `tomorrow`
+- **ISO dates**: `2024-01-15`, `20240115`
+- **With offset**: Use `offset: -2` to go back 2 additional days
 
 ## Contributing
 

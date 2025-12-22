@@ -26,11 +26,21 @@ Types of changes:
   - `run`: Execute checks (previously the default behavior)
   - `validate`: Validate configuration without execution
   - `print`: Print resolved configuration in model/yaml/json formats with configurable indentation
+- **Filters in global defaults**: Filters can now be configured in global `defaults` and are merged with bundle-level and check-level filters
+- **Identifier filter type**: New filter type `identifier` to mark filters that identify data partitions (e.g., shop, tenant)
+- **Identifier format configuration**: New `identifier_format` global setting with three options:
+  - `identifier` (default): Result column `IDENTIFIER` with value `column=value`
+  - `filter_name`: Result column uses filter name (e.g., `SHOP_ID`), value only
+  - `column_name`: Result column uses database column name (e.g., `SHOP_CODE`), value only
+- **NULL value filtering**: Filters now support `null` values for `IS NULL` / `IS NOT NULL` filtering
+- **Validation for identifier consistency**: When using `filter_name` or `column_name` format, all identifier filters must have the same filter name or column name respectively
 
 ### Changed
 
 - Add missing type hints and migrate Optional/Union to modern union syntax
 - **BREAKING**: CLI now uses subcommands. Previous `koality --config_path <file>` is now `koality run --config_path <file>`
+- **BREAKING**: Check class constructors now use explicit parameters instead of `**kwargs` for `filters`, `identifier_format`, `date_info`, `extra_info`, and `monitor_only`
+- **BREAKING**: Reordered keyword-only parameters in check classes: `filters`, `identifier_format`, `date_info`, `extra_info`, `monitor_only` (monitor_only is now last)
 
 ## [0.1.0] - 2025-12-09
 

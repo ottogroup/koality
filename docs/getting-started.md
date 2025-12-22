@@ -39,10 +39,12 @@ database_setup: |
 database_accessor: my_db
 
 defaults:
-  monitor_only: false
   result_table: dqm_results
-  date_filter_column: date
-  date_filter_value: "2024-01-01"
+  filters:
+    partition_date:
+      column: date
+      value: "2024-01-01"
+      type: date
 
 check_bundles:
   - name: orders_checks
@@ -110,7 +112,7 @@ koality run --config_path checks.yaml
 You can override default configuration values via CLI arguments:
 
 ```bash
-koality run --config_path checks.yaml --date_filter_value 2024-01-01
+koality run --config_path checks.yaml
 ```
 
 ### 4. Validate Configuration
@@ -143,17 +145,17 @@ koality print --config_path checks.yaml --format yaml --indent 4
 
 Each check returns a result dictionary with the following fields:
 
-| Field | Description |
-|-------|-------------|
-| `DATE` | The date the check was run for |
-| `METRIC_NAME` | Name of the metric/check |
-| `SHOP_ID` | Shop identifier (if using shop filters) |
-| `TABLE` | Table being checked |
-| `COLUMN` | Column being checked |
-| `VALUE` | Actual value measured |
-| `LOWER_THRESHOLD` | Lower threshold for passing |
-| `UPPER_THRESHOLD` | Upper threshold for passing |
-| `RESULT` | `SUCCESS`, `FAIL`, `MONITOR_ONLY`, or `ERROR` |
+| Field             | Description                                                      |
+|-------------------|------------------------------------------------------------------|
+| `DATE`            | The date the check was run for                                   |
+| `METRIC_NAME`     | Name of the metric/check                                         |
+| `IDENTIFIER`      | Identifier value (format depends on `identifier_format` setting) |
+| `TABLE`           | Table being checked                                              |
+| `COLUMN`          | Column being checked                                             |
+| `VALUE`           | Actual value measured                                            |
+| `LOWER_THRESHOLD` | Lower threshold for passing                                      |
+| `UPPER_THRESHOLD` | Upper threshold for passing                                      |
+| `RESULT`          | `SUCCESS`, `FAIL`, `MONITOR_ONLY`, or `ERROR`                    |
 
 ## Next Steps
 

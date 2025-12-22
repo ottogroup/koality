@@ -21,23 +21,30 @@ name: string                    # Name of the configuration
 database_setup: string          # SQL to set up database connections
 database_accessor: string       # Database accessor prefix for tables
 
-defaults:                # Global default settings
+defaults:                       # Global default settings
   monitor_only: bool            # If true, checks don't fail the run
   result_table: string          # Table to store results (optional)
-  log_path: string              # Path to write failed checks log (optional)
-  date_filter_column: string    # Default date filter column
-  date_filter_value: string     # Default date filter value
-  filter_column: string         # Default filter column
-  filter_value: string          # Default filter value
+  log_path: string              # File path to write failed checks log (optional)
+  identifier_format: string     # How to format identifier in results (optional)
+  filters:                      # Default filters applied to all checks
+    <filter_name>:
+      column: string            # Column to filter on
+      value: any                # Filter value (use null for IS NULL)
+      type: date | identifier | other  # Filter type
+      operator: string          # Comparison operator (default: "=")
+      parse_as_date: bool       # Parse value as date (default: false)
+      offset: int               # Days offset for date parsing (default: 0)
 
 check_bundles:                  # List of check bundles
   - name: string                # Bundle name
-    defaults:               # Default arguments for checks in this bundle
+    defaults:                   # Default arguments for checks in this bundle
       table: string
       check_column: string
+      filters: {...}            # Bundle-level default filters
       # ... other defaults
     checks:                     # List of checks
       - check_type: string      # Type of check (required)
+        filters: {...}          # Check-level filters (merged with defaults)
         # ... check-specific arguments
 ```
 
@@ -93,15 +100,37 @@ When using BigQuery, Koality automatically:
 
 Global defaults are applied to all checks unless overridden at the bundle or check level.
 
-| Field                | Type   | Description                                          |
-|----------------------|--------|------------------------------------------------------|
-| `monitor_only`       | bool   | If `true`, check failures don't fail the overall run |
-| `result_table`       | string | Table name for persisting check results              |
-| `log_path`           | string | File path to write failed checks log                 |
-| `date_filter_column` | string | Column name for date filtering                       |
-| `date_filter_value`  | string | Value for date filtering                             |
-| `filter_column`      | string | Column name for generic filtering                    |
-| `filter_value`       | string | Value for generic filtering                          |
+| Field               | Type   | Description                                          |
+|---------------------|--------|------------------------------------------------------|
+| `monitor_only`      | bool   | If `true`, check failures don't fail the overall run |
+| `result_table`      | string | Table name for persisting check results              |
+| `log_path`          | string | File path to write failed checks log                 |
+| `identifier_format` | string | How to format identifier in output (see below)       |
+| `filters`           | object | Default filters applied to all checks (see Filtering section) |
+
+### Identifier Format
+
+The `identifier_format` option controls how the identifier filter value appears in check results and messages. Three options are available:
+
+| Format          | Result Column | Value Format           | Example                    |
+|-----------------|---------------|------------------------|----------------------------|
+| `identifier`    | `IDENTIFIER`  | `column=value`         | `shop_code=SHOP001`        |
+| `filter_name`   | Filter name   | Value only             | Column: `SHOP_ID`, Value: `SHOP001` |
+| `column_name`   | Column name   | Value only             | Column: `SHOP_CODE`, Value: `SHOP001` |
+
+**Default**: `identifier`
+
+**Consistency requirement**: When using `filter_name` or `column_name` format, all identifier filters across all checks must use the same filter name or column name respectively. This ensures consistent column headers in results. The `identifier` format has no such restriction since it always uses `IDENTIFIER` as the column header.
+
+```yaml
+defaults:
+  identifier_format: identifier  # or "filter_name" or "column_name"
+  filters:
+    shop_id:
+      column: shop_code
+      value: SHOP001
+      type: identifier
+```
 
 ## Check Bundles
 
@@ -112,7 +141,11 @@ check_bundles:
   - name: orders_quality
     defaults:
       table: orders
-      date_filter_column: order_date
+      filters:
+        partition_date:
+          column: order_date
+          value: yesterday
+          type: date
     checks:
       - check_type: NullRatioCheck
         check_column: customer_id
@@ -161,15 +194,18 @@ Validates that column values are within an allowed set.
 
 ### RollingValuesInSetCheck
 
-Rolling window version of ValuesInSetCheck (14-day window).
+Rolling window version of ValuesInSetCheck (14-day window). Requires a filter with `type: date`.
 
 ```yaml
 - check_type: RollingValuesInSetCheck
   table: my_table
   check_column: category
   value_set: ["A", "B", "C"]
-  date_filter_column: created_at
-  date_filter_value: "2024-01-01"
+  filters:
+    partition_date:
+      column: created_at
+      value: yesterday
+      type: date
   lower_threshold: 0.95
 ```
 
@@ -228,29 +264,35 @@ Validates join match rates between two tables.
 
 ### RelCountChangeCheck
 
-Detects relative count changes over a rolling window.
+Detects relative count changes over a rolling window. Requires a filter with `type: date`.
 
 ```yaml
 - check_type: RelCountChangeCheck
   table: my_table
   check_column: "*"
   rolling_days: 7
-  date_filter_column: date
-  date_filter_value: "2024-01-01"
-  lower_threshold: 0.8    # At least 80% of average
-  upper_threshold: 1.2    # At most 120% of average
+  filters:
+    partition_date:
+      column: date
+      value: yesterday
+      type: date
+  lower_threshold: -0.2   # At least 80% of average
+  upper_threshold: 0.2    # At most 120% of average
 ```
 
 ### IqrOutlierCheck
 
-Detects outliers using interquartile range.
+Detects outliers using interquartile range. Requires a filter with `type: date`.
 
 ```yaml
 - check_type: IqrOutlierCheck
   table: my_table
   check_column: amount
-  date_filter_column: date
-  date_filter_value: "2024-01-01"
+  filters:
+    partition_date:
+      column: date
+      value: yesterday
+      type: date
   interval_days: 30
   how: "both"             # "both", "upper", or "lower"
   iqr_factor: 1.5
@@ -260,19 +302,204 @@ Detects outliers using interquartile range.
 
 ## Filtering
 
-Checks support filtering using column/value pairs:
+Checks support filtering using a structured `filters` configuration:
 
 ```yaml
 - check_type: CountCheck
   table: orders
   check_column: "*"
-  shop_id_filter_column: shop_code
-  shop_id_filter_value: "SHOP01"
-  date_filter_column: order_date
-  date_filter_value: "2024-01-01"
+  filters:
+    partition_date:
+      column: order_date
+      value: yesterday
+      type: date
+    shop_id:
+      column: shop_code
+      value: "SHOP01"
+      type: identifier
 ```
 
-The filter pattern is `{name}_filter_column` paired with `{name}_filter_value`.
+### Filter Configuration
+
+Each filter has the following properties:
+
+| Property        | Type   | Required | Description                                                                                   |
+|-----------------|--------|----------|-----------------------------------------------------------------------------------------------|
+| `column`        | string | Yes*     | The database column name to filter on                                                         |
+| `value`         | any    | Yes*     | The filter value (string, number, list for IN operators, or `null` for IS NULL)              |
+| `operator`      | string | No       | SQL operator: `=`, `!=`, `>`, `>=`, `<`, `<=`, `IN`, `NOT IN`, `LIKE`. Default: `=`          |
+| `type`          | string | No       | Filter type: `date`, `identifier`, or `other`. Default: `other`                              |
+| `parse_as_date` | bool   | No       | If `true`, parse the value as a date (supports relative dates). Default: `false`             |
+| `offset`        | int    | No       | Days to offset the date (only when `type: date` or `parse_as_date: true`). Default: `0`      |
+
+*`column` and `value` are optional in defaults (global or bundle level) but must be set after merging. This allows defining partial filters in defaults that are completed at the check level.
+
+### Filter Types
+
+Koality supports three filter types:
+
+| Type         | Purpose                                      | Limit      |
+|--------------|----------------------------------------------|------------|
+| `date`       | Date filter for rolling checks               | One per check |
+| `identifier` | Identifier for grouping results (e.g., shop) | One per check |
+| `other`      | Regular filters                              | Unlimited  |
+
+### Identifier Filters
+
+Use `type: identifier` to mark the filter that identifies your data partition (e.g., shop, tenant, region):
+
+```yaml
+filters:
+  shop_id:
+    column: shop_code
+    value: SHOP001
+    type: identifier
+```
+
+The identifier value appears in check results and failure messages. How it's formatted depends on the `identifier_format` global setting.
+
+### Date Filters
+
+When `type: date` is set, the value is automatically parsed as a date. Supported formats:
+
+- **ISO dates**: `2024-01-15`, `20240115`
+- **Relative dates**: `today`, `yesterday`, `tomorrow`
+- **With offset**: Use the `offset` property to add/subtract days
+
+```yaml
+filters:
+  partition_date:
+    column: BQ_PARTITIONTIME
+    value: yesterday      # Automatically parsed to ISO date
+    type: date
+    offset: -1            # Go back one more day (2 days ago total)
+```
+
+**Important**: Only one filter with `type: date` is allowed per check. This is the filter used by rolling checks (`RollingValuesInSetCheck`, `RelCountChangeCheck`, `IqrOutlierCheck`) for their date-based calculations.
+
+If you need to parse multiple date values, use `parse_as_date: true` for additional filters:
+
+```yaml
+filters:
+  partition_date:
+    column: BQ_PARTITIONTIME
+    value: yesterday
+    type: date              # THE date filter for rolling checks
+  created_after:
+    column: created_at
+    value: today
+    parse_as_date: true     # Also parses date, but isn't "the" date filter
+    offset: -7              # 7 days ago
+    operator: ">="
+```
+
+### Operators
+
+Use the `operator` property for different comparison types:
+
+```yaml
+filters:
+  # Equality (default)
+  status:
+    column: order_status
+    value: completed
+
+  # Greater than
+  revenue:
+    column: total_revenue
+    value: 1000
+    operator: ">="
+
+  # IN operator (list of values)
+  category:
+    column: category
+    value: ["toys", "electronics", "clothing"]
+    operator: "IN"
+
+  # NOT IN operator
+  excluded:
+    column: region
+    value: ["test", "staging"]
+    operator: "NOT IN"
+
+  # LIKE operator (pattern matching)
+  email_domain:
+    column: email
+    value: "%@example.com"
+    operator: "LIKE"
+
+  # IS NULL (filter for missing values)
+  not_deleted:
+    column: deleted_at
+    value: null           # or ~ or empty
+    operator: "="         # generates: deleted_at IS NULL
+
+  # IS NOT NULL (filter for existing values)
+  has_email:
+    column: email
+    value: null
+    operator: "!="        # generates: email IS NOT NULL
+```
+
+### Default Filters
+
+Filters can be defined at any level (global defaults, bundle defaults, or individual checks) and are merged with inheritance:
+
+```yaml
+defaults:
+  filters:
+    partition_date:
+      column: DATE
+      value: yesterday
+      type: date
+
+check_bundles:
+  - name: orders
+    defaults:
+      filters:
+        shop_id:
+          column: shop_code
+          value: "SHOP01"
+    checks:
+      - check_type: CountCheck
+        table: orders
+        check_column: "*"
+        # Inherits both partition_date and shop_id filters
+```
+
+### Partial Filters in Defaults
+
+You can define partial filters in defaults (omitting `column` or `value`) and complete them at a lower level:
+
+```yaml
+defaults:
+  filters:
+    shop_id:
+      column: shopId       # Define column once
+      type: identifier     # Define type once
+      # value not set - must be set per check
+
+check_bundles:
+  - name: shop1_checks
+    defaults:
+      table: orders
+      filters:
+        shop_id:
+          value: SHOP001   # Set value, inherits column and type
+    checks:
+      - check_type: CountCheck
+        check_column: "*"
+
+  - name: shop2_checks
+    defaults:
+      table: orders
+    checks:
+      - check_type: CountCheck
+        check_column: "*"
+        filters:
+          shop_id:
+            value: SHOP002   # Set value at check level
+```
 
 ## Example Configuration
 
@@ -286,13 +513,22 @@ defaults:
   monitor_only: false
   result_table: dqm_results
   log_path: /var/log/dqm/failed_checks.log
-  date_filter_column: date
-  date_filter_value: "2024-01-01"
+  identifier_format: identifier  # Results show "shop_code=SHOP01"
+  filters:
+    partition_date:
+      column: date
+      value: yesterday
+      type: date
 
 check_bundles:
   - name: orders
     defaults:
       table: orders
+      filters:
+        shop_id:
+          column: shop_code
+          value: "SHOP01"
+          type: identifier
     checks:
       - check_type: NullRatioCheck
         check_column: order_id

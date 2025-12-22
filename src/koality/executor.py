@@ -141,6 +141,7 @@ class CheckExecutor:
                 check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_unset=True)
                 check_kwargs["database_accessor"] = self.config.database_accessor
                 check_kwargs["database_provider"] = database_provider
+                check_kwargs["identifier_format"] = self.config.defaults.identifier_format
                 check_instance = check_factory(**check_kwargs)
                 self.checks.append(check_instance)
 
@@ -182,13 +183,13 @@ class CheckExecutor:
             parts = msg.split(":", 1)
             if len(parts) == expected_parts_count:
                 table_part = parts[0]
-                shop_id = parts[1].strip()
+                identifier = parts[1].strip()
                 if table_part not in grouped_data:
                     grouped_data[table_part] = []
-                grouped_data[table_part].append(shop_id)
+                grouped_data[table_part].append(identifier)
 
         msgs_no_data = [
-            f"{table_part}: {self.aggregate_values(shop_ids)}" for table_part, shop_ids in grouped_data.items()
+            f"{table_part}: {self.aggregate_values(identifiers)}" for table_part, identifiers in grouped_data.items()
         ]
 
         return msgs_no_data + msgs_other
@@ -198,9 +199,9 @@ class CheckExecutor:
 
         If data tables to be checked do not contain any data, a specific failure
         will be created. As a larger number of such failures can be created (for
-        different checks or for different shop IDs), we aggregate missing data
-        failures, grouping them by table and date and joining all distinct shop
-        IDs to a comma-separated list.
+        different checks or for different identifiers), we aggregate missing data
+        failures, grouping them by table and date and joining all distinct identifiers
+        to a comma-separated list.
 
         Args:
             result_dicts: A list of check result dicts.
@@ -219,6 +220,9 @@ class CheckExecutor:
         if not result_no_data:
             return result_other
 
+        # Get identifier column name from the first result
+        identifier_column = self.checks[0].identifier_column if self.checks else "IDENTIFIER"
+
         grouped_data = {}
         for result in result_no_data:
             key = (result["DATE"], result["METRIC_NAME"], result["TABLE"])
@@ -227,16 +231,16 @@ class CheckExecutor:
                     "DATE": result["DATE"],
                     "METRIC_NAME": result["METRIC_NAME"],
                     "TABLE": result["TABLE"],
-                    "SHOP_ID": [],
+                    "_identifier_values": [],
                 }
-            grouped_data[key]["SHOP_ID"].append(result["SHOP_ID"])
+            grouped_data[key]["_identifier_values"].append(result[identifier_column])
 
         result_no_data = [
             {
                 "DATE": value["DATE"],
                 "METRIC_NAME": value["METRIC_NAME"],
                 "TABLE": value["TABLE"],
-                "SHOP_ID": self.aggregate_values(value["SHOP_ID"]),
+                identifier_column: self.aggregate_values(value["_identifier_values"]),
                 "COLUMN": None,
                 "VALUE": None,
                 "LOWER_THRESHOLD": None,
@@ -278,6 +282,9 @@ class CheckExecutor:
 
         now = datetime.datetime.now(tz=datetime.UTC)
 
+        # Get the identifier column name from the first check (all checks have the same column name)
+        identifier_column = self.checks[0].identifier_column if self.checks else "IDENTIFIER"
+
         # Copy rows first, cause INSERT_TIMESTAMP and AUTO value is only a BQ feature and not needed anywhere else
         results_with_it: list[dict] = self._aggregate_result_dicts(self.result_dicts).copy()
         # Add INSERT_TIMESTAMP col with AUTO value to automatically set insert_timestamp (BQ feature)
@@ -290,9 +297,9 @@ class CheckExecutor:
                 CREATE TABLE IF NOT EXISTS {self.result_table} (
                     DATE {DATA_TYPES["DATE"][database_provider.type]},
                     METRIC_NAME {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    TABLE {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    SHOP_ID {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    COLUMN {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    `TABLE` {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    {identifier_column} {DATA_TYPES["VARCHAR"][database_provider.type]},
+                    `COLUMN` {DATA_TYPES["VARCHAR"][database_provider.type]},
                     VALUE {DATA_TYPES["VARCHAR"][database_provider.type]},
                     LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
                     UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
@@ -316,16 +323,16 @@ class CheckExecutor:
                 [
                     f"""
                     (
-                        "{row["DATE"]}",
-                        "{row["METRIC_NAME"]}",
-                        "{row["TABLE"]}",
-                        "{row["SHOP_ID"]}",
-                        "{row["COLUMN"]}",
+                        '{row["DATE"]}',
+                        '{row["METRIC_NAME"]}',
+                        '{row["TABLE"]}',
+                        '{row[identifier_column]}',
+                        {f"'{row['COLUMN']}'" if row["COLUMN"] is not None else "NULL"},
                         {row["VALUE"] if row["VALUE"] is not None else "NULL"},
-                        {row["LOWER_THRESHOLD"]},
-                        {row["UPPER_THRESHOLD"]},
-                        "{row["RESULT"]}",
-                        "{row["INSERT_TIMESTAMP"]}"
+                        {row["LOWER_THRESHOLD"] if row["LOWER_THRESHOLD"] is not None else "NULL"},
+                        {row["UPPER_THRESHOLD"] if row["UPPER_THRESHOLD"] is not None else "NULL"},
+                        '{row["RESULT"]}',
+                        '{row["INSERT_TIMESTAMP"]}'
                     )
                 """
                     for row in results_with_it
@@ -333,7 +340,7 @@ class CheckExecutor:
             )
             query_insert_values_into_result_table = f"""
                 INSERT INTO {self.result_table}
-                (DATE, METRIC_NAME, `TABLE`, SHOP_ID, `COLUMN`, VALUE, LOWER_THRESHOLD, UPPER_THRESHOLD, RESULT, INSERT_TIMESTAMP)
+                (DATE, METRIC_NAME, `TABLE`, {identifier_column}, `COLUMN`, VALUE, LOWER_THRESHOLD, UPPER_THRESHOLD, RESULT, INSERT_TIMESTAMP)
                 VALUES {values_clause}
             """  # noqa: S608, E501
             try:
