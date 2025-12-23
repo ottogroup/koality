@@ -73,7 +73,7 @@ dev = [
     "zizmor>=1.2.2",
     "poethepoet>=0.37.0",
     "deptry>=0.24.0",
-    "uv-secure>=0.15.2",
+    "pysentry-rs>=0.3.12",
 ]
 
 docs = [
@@ -118,7 +118,7 @@ lint = [
     { cmd = "ruff check" },
 ]
 # Security and dependency checks.
-check_vulnerable_dependencies = "uv-secure"
+check_vulnerable_dependencies = "pysentry-rs --sources pypa,osv,pypi"
 check_unused_dependencies = "deptry src/koality"
 check_githubactions = "zizmor .github/workflows/"
 # Testing.
