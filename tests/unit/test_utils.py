@@ -10,25 +10,24 @@ pytestmark = pytest.mark.unit
 
 
 @pytest.mark.parametrize(
-    ("input_date", "offset", "expected"),
+    ("input_date", "expected"),
     [
-        ("today", 0, dt.datetime.now(tz=dt.UTC).date().isoformat()),
-        ("yesterday", 0, (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=1)).isoformat()),
-        ("tomorrow", 0, (dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=1)).isoformat()),
-        ("today", 1, (dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=1)).isoformat()),
-        ("yesterday", 1, dt.datetime.now(tz=dt.UTC).date().isoformat()),
-        ("tomorrow", 1, (dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=2)).isoformat()),
-        ("today", -2, (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=2)).isoformat()),
-        ("yesterday", -2, (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=3)).isoformat()),
-        ("tomorrow", -2, (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=1)).isoformat()),
-        ("19901003", 0, "1990-10-03"),
-        ("19901003", 5, "1990-10-08"),
-        ("1990-10-03", 0, "1990-10-03"),
+        ("today", dt.datetime.now(tz=dt.UTC).date().isoformat()),
+        ("yesterday", (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=1)).isoformat()),
+        ("tomorrow", (dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=1)).isoformat()),
+        ("today+1", (dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=1)).isoformat()),
+        ("yesterday+1", dt.datetime.now(tz=dt.UTC).date().isoformat()),
+        ("tomorrow+1", (dt.datetime.now(tz=dt.UTC).date() + dt.timedelta(days=2)).isoformat()),
+        ("today-2", (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=2)).isoformat()),
+        ("yesterday-2", (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=3)).isoformat()),
+        ("tomorrow-2", (dt.datetime.now(tz=dt.UTC).date() - dt.timedelta(days=1)).isoformat()),
+        ("19901003", "1990-10-03"),
+        ("1990-10-03", "1990-10-03"),
     ],
 )
-def test_parse_date(input_date: str, offset: int, expected: str) -> None:
-    """Test parse_date function with various date inputs and offsets."""
-    assert expected == parse_date(input_date, offset)
+def test_parse_date(input_date: str, expected: str) -> None:
+    """Test parse_date function with various date inputs including inline offsets."""
+    assert expected == parse_date(input_date)
 
 
 @pytest.mark.parametrize(

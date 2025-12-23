@@ -79,35 +79,38 @@ def execute_query(
     return duckdb_client.query(query)
 
 
-def parse_date(date: str, offset_days: int = 0) -> str:
+def parse_date(date: str) -> str:
     """Parse a date string to an ISO format date.
 
     Supports relative terms like "today", "yesterday", or "tomorrow",
-    actual dates, or relative dates like "today-2".
+    actual dates, or relative dates with offsets like "today-2", "yesterday+1".
 
     Args:
-        date: The date string to be parsed.
-        offset_days: The number of days to be added/substracted.
+        date: The date string to be parsed. Supports:
+            - "today", "yesterday", "tomorrow"
+            - "today+N", "today-N" (e.g., "today-2" for 2 days ago)
+            - "yesterday+N", "yesterday-N" (e.g., "yesterday-2" for 3 days ago)
+            - "tomorrow+N", "tomorrow-N"
+            - ISO format dates like "2023-01-15"
 
     """
     date = str(date).lower()
 
-    if date == "today":
+    # Handle relative dates with optional offset: today, yesterday, tomorrow with +/- N
+    if regex_match := re.match(r"(today|yesterday|tomorrow)([+-]\d+)?$", date):
+        base = regex_match[1]
+        offset_str = regex_match[2]
+        offset_days = int(offset_str) if offset_str else 0
+
+        if base == "yesterday":
+            offset_days -= 1
+        elif base == "tomorrow":
+            offset_days += 1
+
         return (dt.datetime.now(tz=dt.UTC) + dt.timedelta(days=offset_days)).date().isoformat()
 
-    if date == "yesterday":
-        offset_days -= 1
-        return (dt.datetime.now(tz=dt.UTC) + dt.timedelta(days=offset_days)).date().isoformat()
-
-    if date == "tomorrow":
-        offset_days += 1
-        return (dt.datetime.now(tz=dt.UTC) + dt.timedelta(days=offset_days)).date().isoformat()
-
-    if regex_match := re.search(r"today([+-][0-9]+)", date):
-        offset_days += int(regex_match[1])
-        return (dt.datetime.now(tz=dt.UTC) + dt.timedelta(days=offset_days)).date().isoformat()
-
-    return (dt.datetime.fromisoformat(date) + dt.timedelta(days=offset_days)).date().isoformat()
+    # Handle ISO format dates
+    return dt.datetime.fromisoformat(date).date().isoformat()
 
 
 def to_set(value: object) -> set[object]:
