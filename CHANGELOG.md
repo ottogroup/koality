@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.4.1] - 2025-12-23
+
 ### Fixed
 
 - **RegexMatchCheck model**: Fixed `check_type` literal in `_RegexMatchCheck` model from incorrect `"NullRatioCheck"` to `"RegexMatchCheck"`. This bug prevented YAML configurations using `check_type: RegexMatchCheck` from being parsed correctly.
@@ -102,7 +104,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.4.1...HEAD
+[0.4.1]: https://github.com/ottogroup/koality/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ottogroup/koality/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ottogroup/koality/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ottogroup/koality/compare/v0.1.0...v0.2.0
