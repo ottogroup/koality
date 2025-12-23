@@ -96,9 +96,17 @@ dependencies = [
 # koality_config.yaml
 name: My Data Quality Checks
 
+# Database connection setup - executed before running checks
+database_setup: |
+  INSTALL bigquery;
+  LOAD bigquery;
+  ATTACH 'project=${PROJECT_ID}' AS bq (TYPE bigquery, READ_ONLY);
+
+# Prefix for table references (use attached database name)
+database_accessor: bq
+
 defaults:
-  result_table: my_project.dqm.results
-  persist_results: true
+  result_table: bq.dqm.results
   log_path: dqm_failures.txt
   filters:
     partition_date:
@@ -110,7 +118,7 @@ check_bundles:
   - name: null_ratio_checks
     defaults:
       check_type: NullRatioCheck
-      table: my_project.dataset.orders
+      table: bq.dataset.orders
       lower_threshold: 0
       upper_threshold: 0.05
     checks:
@@ -119,10 +127,23 @@ check_bundles:
       - check_column: total_amount
 ```
 
+For in-memory DuckDB (local testing or CSV/Parquet files):
+
+```yaml
+database_setup: |
+  CREATE TABLE orders AS SELECT * FROM 'data/orders.parquet';
+  CREATE TABLE results (check_name VARCHAR, result DOUBLE, timestamp TIMESTAMP);
+database_accessor: ""
+```
+
 ### 2. Run checks via CLI
 
 ```bash
-koality run --config_path koality_config.yaml
+# Pass database setup variables via CLI
+koality run --config_path koality_config.yaml -dsv PROJECT_ID=my-gcp-project
+
+# Or via environment variable
+DATABASE_SETUP_VARIABLES="PROJECT_ID=my-gcp-project" koality run --config_path koality_config.yaml
 ```
 
 ### 3. Review results
