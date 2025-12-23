@@ -2,36 +2,38 @@
 
 import json
 from pathlib import Path
+from textwrap import dedent
 
+import click
 import pytest
 import yaml
 from click.testing import CliRunner
 
-from koality.cli import cli
+from koality.cli import _apply_overwrites_to_dict, _parse_overwrites, cli
 
 pytestmark = pytest.mark.unit
 
-VALID_CONFIG = """
-name: test_config
-database_setup: ""
-database_accessor: memory
+VALID_CONFIG = dedent("""\
+    name: test_config
+    database_setup: ""
+    database_accessor: memory
 
-defaults:
-  monitor_only: true
+    defaults:
+      monitor_only: true
 
-check_bundles:
-  - name: test_bundle
-    checks:
-      - check_type: CountCheck
-        table: test_table
-        check_column: id
-        lower_threshold: 0
-        upper_threshold: 100
-"""
+    check_bundles:
+      - name: test_bundle
+        checks:
+          - check_type: CountCheck
+            table: test_table
+            check_column: id
+            lower_threshold: 0
+            upper_threshold: 100
+    """)
 
-INVALID_CONFIG = """
-name: missing_required_fields
-"""
+INVALID_CONFIG = dedent("""\
+    name: missing_required_fields
+    """)
 
 
 @pytest.fixture
@@ -146,6 +148,53 @@ class TestPrintCommand:
         result = runner.invoke(cli, ["print", "--config_path", "nonexistent.yaml"])
         assert result.exit_code != 0
 
+    def test_print_with_overwrites(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test print command with overwrites option."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: memory
+
+            defaults:
+              monitor_only: true
+              filters:
+                partition_date:
+                  column: DATE
+                  value: yesterday
+                  type: date
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+                "-o",
+                "partition_date=2023-06-15",
+            ],
+        )
+        assert result.exit_code == 0
+        # Verify the overwritten value appears in output
+        assert "2023-06-15" in result.output
+        # Parse JSON and verify the check-level filter was overwritten
+        parsed = json.loads(result.output)
+        check_filter_value = parsed["check_bundles"][0]["checks"][0]["filters"]["partition_date"]["value"]
+        assert check_filter_value == "2023-06-15"
+
 
 class TestRunCommand:
     """Tests for the run command."""
@@ -167,3 +216,690 @@ class TestRunCommand:
         """Test run command with non-existent file."""
         result = runner.invoke(cli, ["run", "--config_path", "nonexistent.yaml"])
         assert result.exit_code != 0
+
+    def test_run_help_shows_overwrites_option(self, runner: CliRunner) -> None:
+        """Test that run command help shows overwrites option."""
+        result = runner.invoke(cli, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "--overwrites" in result.output or "-o" in result.output
+
+
+class TestOverwrites:
+    """Tests for the overwrites functionality."""
+
+    def test_parse_overwrites_valid(self) -> None:
+        """Test parsing valid overwrite arguments."""
+        overwrites = ("filters.partition_date=2023-01-01", "filters.shop_id=SHOP02")
+        result = _parse_overwrites(overwrites)
+        assert result == [("filters.partition_date", "2023-01-01"), ("filters.shop_id", "SHOP02")]
+
+    def test_parse_overwrites_with_spaces(self) -> None:
+        """Test parsing overwrites with spaces around key/value."""
+        overwrites = ("filters.partition_date = 2023-01-01",)
+        result = _parse_overwrites(overwrites)
+        assert result == [("filters.partition_date", "2023-01-01")]
+
+    def test_parse_overwrites_value_with_equals(self) -> None:
+        """Test parsing overwrites where value contains equals sign."""
+        overwrites = ("filter=a=b=c",)
+        result = _parse_overwrites(overwrites)
+        assert result == [("filter", "a=b=c")]
+
+    def test_parse_overwrites_invalid_format(self) -> None:
+        """Test parsing invalid overwrite format raises error."""
+        overwrites = ("invalid_no_equals",)
+        with pytest.raises(click.BadParameter, match="Invalid overwrite format"):
+            _parse_overwrites(overwrites)
+
+    def test_parse_overwrites_empty(self) -> None:
+        """Test parsing empty overwrites."""
+        result = _parse_overwrites(())
+        assert result == []
+
+    def test_apply_overwrites_filter_value(self) -> None:
+        """Test applying filter value overwrite to config dict."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "monitor_only": True,
+                "filters": {
+                    "partition_date": {
+                        "column": "DATE",
+                        "value": "yesterday",
+                        "type": "date",
+                    },
+                },
+            },
+            "check_bundles": [
+                {
+                    "name": "test_bundle",
+                    "checks": [
+                        {
+                            "check_type": "CountCheck",
+                            "table": "test_table",
+                            "check_column": "id",
+                            "lower_threshold": 0,
+                            "upper_threshold": 100,
+                        },
+                    ],
+                },
+            ],
+        }
+
+        # Verify initial value
+        assert config_dict["defaults"]["filters"]["partition_date"]["value"] == "yesterday"
+
+        # Apply overwrite using new path syntax
+        _apply_overwrites_to_dict(config_dict, [("filters.partition_date", "2023-06-15")])
+
+        # Verify overwritten value in defaults
+        assert config_dict["defaults"]["filters"]["partition_date"]["value"] == "2023-06-15"
+
+    def test_apply_overwrites_identifier_format(self) -> None:
+        """Test applying identifier_format overwrite to config dict."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "identifier_format": "filter_name",
+            },
+            "check_bundles": [],
+        }
+
+        # Apply overwrite for identifier_format
+        _apply_overwrites_to_dict(config_dict, [("identifier_format", "column_name")])
+
+        # Verify overwritten value
+        assert config_dict["defaults"]["identifier_format"] == "column_name"
+
+    def test_apply_overwrites_monitor_only(self) -> None:
+        """Test applying monitor_only boolean overwrite."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "monitor_only": True,
+            },
+            "check_bundles": [],
+        }
+
+        # Apply overwrite for monitor_only
+        _apply_overwrites_to_dict(config_dict, [("monitor_only", "false")])
+
+        # Verify overwritten value (should be converted to bool)
+        assert config_dict["defaults"]["monitor_only"] is False
+
+    def test_apply_overwrites_bundle_level(self) -> None:
+        """Test applying overwrite at bundle level."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "identifier_format": "filter_name",
+            },
+            "check_bundles": [
+                {
+                    "name": "my_bundle",
+                    "checks": [],
+                },
+            ],
+        }
+
+        # Apply overwrite at bundle level using explicit check_bundles prefix
+        _apply_overwrites_to_dict(config_dict, [("check_bundles.my_bundle.identifier_format", "column_name")])
+
+        # Verify bundle-level override
+        assert config_dict["check_bundles"][0]["defaults"]["identifier_format"] == "column_name"
+        # Global default should be unchanged
+        assert config_dict["defaults"]["identifier_format"] == "filter_name"
+
+    def test_apply_overwrites_bundle_filter(self) -> None:
+        """Test applying filter overwrite at bundle level."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "filters": {
+                    "partition_date": {
+                        "column": "DATE",
+                        "value": "yesterday",
+                        "type": "date",
+                    },
+                },
+            },
+            "check_bundles": [
+                {
+                    "name": "my_bundle",
+                    "defaults": {
+                        "filters": {
+                            "partition_date": {
+                                "column": "DATE",
+                                "value": "yesterday",
+                                "type": "date",
+                            },
+                        },
+                    },
+                    "checks": [],
+                },
+            ],
+        }
+
+        # Apply overwrite at bundle level only using explicit prefix
+        _apply_overwrites_to_dict(config_dict, [("check_bundles.my_bundle.filters.partition_date", "2023-06-15")])
+
+        # Verify bundle-level override
+        assert config_dict["check_bundles"][0]["defaults"]["filters"]["partition_date"]["value"] == "2023-06-15"
+        # Global default should be unchanged
+        assert config_dict["defaults"]["filters"]["partition_date"]["value"] == "yesterday"
+
+    def test_apply_overwrites_check_level(self) -> None:
+        """Test applying overwrite at specific check level."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {},
+            "check_bundles": [
+                {
+                    "name": "my_bundle",
+                    "checks": [
+                        {
+                            "check_type": "CountCheck",
+                            "table": "test_table",
+                            "check_column": "id",
+                            "lower_threshold": 0,
+                            "upper_threshold": 100,
+                        },
+                        {
+                            "check_type": "NullRatioCheck",
+                            "table": "test_table",
+                            "check_column": "name",
+                            "upper_threshold": 0.1,
+                        },
+                    ],
+                },
+            ],
+        }
+
+        # Apply overwrite to specific check by index using explicit prefix
+        _apply_overwrites_to_dict(config_dict, [("check_bundles.my_bundle.0.table", "other_table")])
+
+        # Verify check-level override
+        assert config_dict["check_bundles"][0]["checks"][0]["table"] == "other_table"
+        # Second check should be unchanged
+        assert config_dict["check_bundles"][0]["checks"][1]["table"] == "test_table"
+
+    def test_apply_overwrites_check_filter(self) -> None:
+        """Test applying filter overwrite at specific check level."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {},
+            "check_bundles": [
+                {
+                    "name": "my_bundle",
+                    "checks": [
+                        {
+                            "check_type": "CountCheck",
+                            "table": "test_table",
+                            "check_column": "id",
+                            "filters": {
+                                "partition_date": {
+                                    "column": "DATE",
+                                    "value": "yesterday",
+                                    "type": "date",
+                                },
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+
+        # Apply filter overwrite to specific check using explicit prefix
+        _apply_overwrites_to_dict(config_dict, [("check_bundles.my_bundle.0.filters.partition_date", "2023-06-15")])
+
+        # Verify check-level filter override
+        assert config_dict["check_bundles"][0]["checks"][0]["filters"]["partition_date"]["value"] == "2023-06-15"
+
+    def test_apply_overwrites_creates_nonexistent_filter(self) -> None:
+        """Test applying overwrite for non-existent filter creates it."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "monitor_only": True,
+                "filters": {
+                    "partition_date": {
+                        "column": "DATE",
+                        "value": "yesterday",
+                        "type": "date",
+                    },
+                },
+            },
+            "check_bundles": [],
+        }
+
+        # Apply overwrite for non-existent filter - this creates the filter
+        _apply_overwrites_to_dict(config_dict, [("filters.new_filter", "some_value")])
+
+        # Original filter should be unchanged
+        assert config_dict["defaults"]["filters"]["partition_date"]["value"] == "yesterday"
+        # New filter should be created with the value
+        assert config_dict["defaults"]["filters"]["new_filter"] == {"value": "some_value"}
+
+    def test_apply_overwrites_check_level_inherited_filter(self) -> None:
+        """Test applying overwrite at check level for filter inherited from defaults."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "filters": {
+                    "date": {
+                        "column": "DATE",
+                        "value": "yesterday",
+                        "type": "date",
+                    },
+                },
+            },
+            "check_bundles": [
+                {
+                    "name": "my_bundle",
+                    "checks": [
+                        {
+                            "check_type": "CountCheck",
+                            "table": "test_table",
+                            "check_column": "id",
+                            # Note: no filters defined - inherited from defaults
+                        },
+                    ],
+                },
+            ],
+        }
+
+        # Apply overwrite at check level for filter that's inherited from defaults
+        _apply_overwrites_to_dict(config_dict, [("check_bundles.my_bundle.0.date", "today-2")])
+
+        # Check should now have the filter with overwritten value
+        check = config_dict["check_bundles"][0]["checks"][0]
+        assert check["filters"]["date"] == {"value": "today-2"}
+
+    def test_apply_overwrites_filter_column(self) -> None:
+        """Test applying filter column overwrite."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "filters": {
+                    "partition_date": {
+                        "column": "DATE",
+                        "value": "yesterday",
+                        "type": "date",
+                    },
+                },
+            },
+            "check_bundles": [],
+        }
+
+        # Apply overwrite for filter column
+        _apply_overwrites_to_dict(config_dict, [("filters.partition_date.column", "OTHER_DATE_COL")])
+
+        # Verify column was overwritten
+        assert config_dict["defaults"]["filters"]["partition_date"]["column"] == "OTHER_DATE_COL"
+        # Value should be unchanged
+        assert config_dict["defaults"]["filters"]["partition_date"]["value"] == "yesterday"
+
+    def test_apply_overwrites_filter_operator(self) -> None:
+        """Test applying filter operator overwrite."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "filters": {
+                    "amount": {
+                        "column": "total_amount",
+                        "value": "100",
+                        "operator": "=",
+                    },
+                },
+            },
+            "check_bundles": [],
+        }
+
+        # Apply overwrite for filter operator
+        _apply_overwrites_to_dict(config_dict, [("filters.amount.operator", ">=")])
+
+        # Verify operator was overwritten
+        assert config_dict["defaults"]["filters"]["amount"]["operator"] == ">="
+
+    def test_apply_overwrites_filter_explicit_value(self) -> None:
+        """Test applying filter value with explicit .value path."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {
+                "filters": {
+                    "partition_date": {
+                        "column": "DATE",
+                        "value": "yesterday",
+                        "type": "date",
+                    },
+                },
+            },
+            "check_bundles": [],
+        }
+
+        # Apply overwrite using explicit .value path
+        _apply_overwrites_to_dict(config_dict, [("filters.partition_date.value", "2023-06-15")])
+
+        # Verify value was overwritten
+        assert config_dict["defaults"]["filters"]["partition_date"]["value"] == "2023-06-15"
+
+    def test_overwrites_propagate_to_checks(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test that overwrites in defaults propagate to all checks."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: memory
+
+            defaults:
+              monitor_only: true
+              filters:
+                partition_date:
+                  column: DATE
+                  value: yesterday
+                  type: date
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+                  - check_type: NullRatioCheck
+                    table: test_table
+                    check_column: name
+                    upper_threshold: 0.1
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+                "-o",
+                "partition_date=2023-06-15",
+            ],
+        )
+        assert result.exit_code == 0
+
+        parsed = json.loads(result.output)
+
+        # Verify defaults was overwritten
+        assert parsed["defaults"]["filters"]["partition_date"]["value"] == "2023-06-15"
+
+        # Verify both checks have the overwritten value (propagated from defaults)
+        checks = parsed["check_bundles"][0]["checks"]
+        assert checks[0]["filters"]["partition_date"]["value"] == "2023-06-15"
+        assert checks[1]["filters"]["partition_date"]["value"] == "2023-06-15"
+
+    def test_run_with_overwrites_cli(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test run command with overwrites option via CLI."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: ""
+
+            defaults:
+              monitor_only: true
+              filters:
+                partition_date:
+                  column: DATE
+                  value: yesterday
+                  type: date
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        # Run with overwrites - this will fail due to missing table but
+        # we can verify the option is accepted
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--config_path",
+                str(config_path),
+                "-o",
+                "partition_date=2023-06-15",
+            ],
+        )
+        # The command accepts the option (exit code may be non-zero due to missing table)
+        # but we verify it doesn't fail on parsing the option
+        assert "Invalid overwrite format" not in result.output
+
+    def test_run_with_invalid_overwrite_format_cli(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test run command with invalid overwrite format via CLI."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: ""
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--config_path",
+                str(config_path),
+                "-o",
+                "invalid_no_equals",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Invalid overwrite format" in result.output
+
+    def test_apply_overwrites_bundle_not_found(self) -> None:
+        """Test that overwrite raises error when bundle doesn't exist."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {},
+            "check_bundles": [
+                {
+                    "name": "existing_bundle",
+                    "checks": [],
+                },
+            ],
+        }
+
+        # Apply overwrite for non-existent bundle
+        with pytest.raises(click.BadParameter, match=r"Bundle 'nonexistent' not found"):
+            _apply_overwrites_to_dict(config_dict, [("check_bundles.nonexistent.filters.date", "2023-01-01")])
+
+    def test_apply_overwrites_bundle_not_found_shows_available(self) -> None:
+        """Test that error message shows available bundles."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {},
+            "check_bundles": [
+                {"name": "bundle_a", "checks": []},
+                {"name": "bundle_b", "checks": []},
+            ],
+        }
+
+        with pytest.raises(click.BadParameter, match=r"Available bundles: bundle_a, bundle_b"):
+            _apply_overwrites_to_dict(config_dict, [("check_bundles.unknown.table", "x")])
+
+    def test_apply_overwrites_check_index_out_of_range(self) -> None:
+        """Test that overwrite raises error when check index is out of range."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {},
+            "check_bundles": [
+                {
+                    "name": "my_bundle",
+                    "checks": [
+                        {"check_type": "CountCheck", "table": "t", "check_column": "c"},
+                    ],
+                },
+            ],
+        }
+
+        # Bundle has 1 check, index 5 is out of range
+        with pytest.raises(click.BadParameter, match=r"Check index 5 out of range.*has 1 checks"):
+            _apply_overwrites_to_dict(config_dict, [("check_bundles.my_bundle.5.table", "other")])
+
+    def test_apply_overwrites_check_index_zero_on_empty_bundle(self) -> None:
+        """Test that overwrite raises error when bundle has no checks."""
+        config_dict = {
+            "name": "test_config",
+            "database_setup": "",
+            "database_accessor": "memory",
+            "defaults": {},
+            "check_bundles": [
+                {
+                    "name": "empty_bundle",
+                    "checks": [],
+                },
+            ],
+        }
+
+        with pytest.raises(click.BadParameter, match=r"Check index 0 out of range.*has 0 checks"):
+            _apply_overwrites_to_dict(config_dict, [("check_bundles.empty_bundle.0.table", "x")])
+
+    def test_cli_error_bundle_not_found(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test CLI shows error when bundle doesn't exist."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: memory
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: orders
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            ["print", "--config_path", str(config_path), "-o", "check_bundles.nonexistent.table=x"],
+        )
+        assert result.exit_code != 0
+        assert "Bundle 'nonexistent' not found" in result.output
+        assert "Available bundles: orders" in result.output
+
+    def test_cli_error_check_index_out_of_range(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test CLI shows error when check index is out of range."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: memory
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: orders
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            ["print", "--config_path", str(config_path), "-o", "check_bundles.orders.5.table=x"],
+        )
+        assert result.exit_code != 0
+        assert "Check index 5 out of range" in result.output
+        assert "has 1 checks" in result.output
+
+    def test_cli_error_bundle_not_found_run_command(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test run command shows error when bundle doesn't exist."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: memory
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: my_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            ["run", "--config_path", str(config_path), "-o", "check_bundles.wrong_name.filters.date=today"],
+        )
+        assert result.exit_code != 0
+        assert "Bundle 'wrong_name' not found" in result.output
+        assert "Available bundles: my_bundle" in result.output

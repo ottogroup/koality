@@ -16,6 +16,15 @@ Types of changes:
 
 ## [Unreleased]
 
+### Added
+
+- **CLI overwrites**: New `--overwrites` (`-o`) option for `run` and `print` commands to override configuration values at runtime. Supports flexible path-based syntax:
+  - Filter values: `-o partition_date=2023-01-01` or `-o filters.partition_date=2023-01-01`
+  - Filter fields: `-o filters.partition_date.column=OTHER_COL` or `-o filters.amount.operator=>=`
+  - Other defaults: `-o identifier_format=column_name` or `-o monitor_only=false`
+  - Bundle-level: `-o check_bundles.my_bundle.filters.partition_date=2023-01-01`
+  - Check-level: `-o check_bundles.my_bundle.0.table=other_table`
+
 ### Changed
 
 - **BREAKING**: Removed `offset` property from filter configuration. Date offsets are now specified inline in the value string (e.g., `yesterday-2`, `today+1`, `tomorrow-3`). This simplifies configuration and makes the offset more visible at the point of use.
