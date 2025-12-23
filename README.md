@@ -167,7 +167,6 @@ defaults:
 | `type`          | `date`, `identifier`, or `other` (default). Only one of each type allowed      |
 | `operator`      | SQL operator: `=`, `!=`, `>`, `>=`, `<`, `<=`, `IN`, `NOT IN`, `LIKE`          |
 | `parse_as_date` | If `true`, parse value as date (for non-date-type filters)                     |
-| `offset`        | Days offset for date parsing (e.g., `-1` for yesterday)                        |
 
 ## Date Parsing
 
@@ -175,7 +174,7 @@ Koality automatically parses date values when `type: date` is set:
 
 - **Relative dates**: `today`, `yesterday`, `tomorrow`
 - **ISO dates**: `2024-01-15`, `20240115`
-- **With offset**: Use `offset: -2` to go back 2 additional days
+- **With inline offset**: `yesterday-2` (2 days before yesterday), `today+1` (tomorrow)
 
 ## Contributing
 
