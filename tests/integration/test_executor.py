@@ -20,19 +20,20 @@ def duckdb_client() -> duckdb.DuckDBPyConnection:
         CREATE TABLE dummy_table (
             shop_code VARCHAR,
             DATE DATE,
-            value FLOAT
+            value FLOAT,
+            product_number VARCHAR
         )
     """)
-    # Insert test data for different shops
+    # Insert test data for different shops with product numbers matching pattern SHOP001-XXXX
     conn.execute("""
         INSERT INTO dummy_table
-        SELECT 'SHOP001', '2023-01-01'::DATE, random()
-        FROM range(100)
+        SELECT 'SHOP001', '2023-01-01'::DATE, random(), 'SHOP001-' || LPAD(CAST(i AS VARCHAR), 4, '0')
+        FROM range(100) AS t(i)
     """)
     conn.execute("""
         INSERT INTO dummy_table
-        SELECT 'SHOP002', '2023-01-01'::DATE, random()
-        FROM range(100)
+        SELECT 'SHOP002', '2023-01-01'::DATE, random(), 'SHOP002-' || LPAD(CAST(i AS VARCHAR), 4, '0')
+        FROM range(100) AS t(i)
     """)
     return conn
 
@@ -226,3 +227,56 @@ def test_executor_missing_data(config_file_missing_data_v2: Path, duckdb_client:
     # Empty table should trigger "No data" message
     assert "No data" in check_message or "empty_table" in check_message
     assert executor.check_failed is True
+
+
+def test_executor_regex_match_check(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test executor with RegexMatchCheck validates product_number pattern."""
+    content = dedent(
+        f"""
+        name: koality-regex-check
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+          log_path: {tmp_path}/message.txt
+
+        check_bundles:
+          - name: regex-bundle
+            defaults:
+              check_type: RegexMatchCheck
+              table: dummy_table
+              check_column: product_number
+              lower_threshold: 0.99
+              upper_threshold: 1.0
+              regex_to_match: 'SHOP\\d{{3}}-\\d{{4}}'
+              filters:
+                date:
+                  column: DATE
+                  value: "2023-01-01"
+                  type: date
+            checks:
+              - filters:
+                  shop_id:
+                    column: shop_code
+                    value: SHOP001
+                    type: identifier
+              - filters:
+                  shop_id:
+                    column: shop_code
+                    value: SHOP002
+                    type: identifier
+        """,
+    ).strip()
+    tmp_file = tmp_path / "koality_config.yaml"
+    tmp_file.write_text(content)
+
+    config = parse_yaml_raw_as(Config, tmp_file.read_text())
+    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
+    result_dict = executor()
+
+    # All product numbers match pattern SHOPXXX-XXXX
+    result = {item["METRIC_NAME"] for item in result_dict}
+    assert "product_number_regex_match_ratio" in result
+    assert not executor.check_failed

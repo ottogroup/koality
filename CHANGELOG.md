@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- **RegexMatchCheck model**: Fixed `check_type` literal in `_RegexMatchCheck` model from incorrect `"NullRatioCheck"` to `"RegexMatchCheck"`. This bug prevented YAML configurations using `check_type: RegexMatchCheck` from being parsed correctly.
+
 ## [0.4.0] - 2025-12-23
 
 ### Added

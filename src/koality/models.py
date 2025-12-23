@@ -204,7 +204,7 @@ class _NullRatioCheck(_SingleTableCheck):
 class _RegexMatchCheck(_SingleTableCheck):
     """Config model for RegexMatchCheck."""
 
-    check_type: Literal["NullRatioCheck"]
+    check_type: Literal["RegexMatchCheck"]
     regex_to_match: str
 
 
