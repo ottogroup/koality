@@ -95,6 +95,56 @@ When using BigQuery, Koality automatically:
 - Uses `bigquery_execute()` for write operations (INSERT, CREATE, etc.)
 - Maps DuckDB types to BigQuery types (e.g., VARCHAR → STRING, NUMERIC → FLOAT64)
 
+### Database Setup Variables
+
+The `database_setup` field supports dynamic variable substitution using `${VAR_NAME}` syntax. This is useful for:
+
+- Using different GCP projects per environment (dev/staging/prod)
+- Keeping sensitive configuration out of YAML files
+- Enabling reusable configurations across different contexts
+
+**Using CLI option (`-dsv`):**
+
+```bash
+# Single variable
+koality run --config_path checks.yaml -dsv PROJECT_ID=my-gcp-project
+
+# Multiple variables
+koality run --config_path checks.yaml -dsv PROJECT_ID=prod-project -dsv DATASET=analytics
+```
+
+**Using environment variable:**
+
+```bash
+# Comma-separated VAR=value pairs
+DATABASE_SETUP_VARIABLES="PROJECT_ID=my-project,DATASET=prod" koality run --config_path checks.yaml
+```
+
+**Example configuration:**
+
+```yaml
+name: bigquery_checks
+database_setup: |
+  INSTALL bigquery;
+  LOAD bigquery;
+  ATTACH 'project=${PROJECT_ID}' AS bq (TYPE bigquery, READ_ONLY);
+database_accessor: bq
+```
+
+**Variable resolution order:**
+
+1. CLI options (`-dsv`) take highest priority
+2. Environment variable (`DATABASE_SETUP_VARIABLES`) is used as fallback
+3. If a variable is referenced but not provided, an error is shown with a helpful hint
+
+**Preview with print:**
+
+Use the `print` command to verify variable substitution before running checks:
+
+```bash
+koality print --config_path checks.yaml -dsv PROJECT_ID=my-project --format yaml
+```
+
 ## Global Defaults
 
 Global defaults are applied to all checks unless overridden at the bundle or check level.

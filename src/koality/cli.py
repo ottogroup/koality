@@ -15,6 +15,7 @@ Example:
 
 """
 
+import os
 from pathlib import Path
 from typing import Any
 
@@ -24,6 +25,9 @@ from pydantic import ValidationError
 
 from koality.executor import CheckExecutor
 from koality.models import Config
+from koality.utils import substitute_variables
+
+DATABASE_SETUP_VARIABLES_ENV = "DATABASE_SETUP_VARIABLES"
 
 
 @click.group()
@@ -50,7 +54,21 @@ def cli() -> None:
     "Overwrites propagate to all checks. Can be used multiple times. "
     "Example: -o partition_date=2023-01-01 -o shop_id=SHOP02",
 )
-def run(config_path: Path, overwrites: tuple[str, ...]) -> None:
+@click.option(
+    "--database_setup_variable",
+    "-dsv",
+    multiple=True,
+    help="Set variables for database_setup substitution. Format: VAR_NAME=value. "
+    "Variables are substituted in database_setup using ${VAR_NAME} syntax. "
+    "Can be used multiple times. Also reads from DATABASE_SETUP_VARIABLES env var "
+    "(format: VAR1=value1,VAR2=value2). CLI options override env vars. "
+    "Example: -dsv PROJECT_ID=my-gcp-project",
+)
+def run(
+    config_path: Path,
+    overwrites: tuple[str, ...],
+    database_setup_variable: tuple[str, ...],
+) -> None:
     """Run koality checks from a configuration file.
 
     Executes all data quality checks defined in the configuration file.
@@ -58,15 +76,25 @@ def run(config_path: Path, overwrites: tuple[str, ...]) -> None:
     Overwrites are applied to defaults before validation, so they
     propagate to all checks automatically.
 
+    Database setup variables can be provided using --database_setup_variable (-dsv)
+    to substitute ${VAR_NAME} placeholders in the database_setup SQL. Variables
+    can also be set via the DATABASE_SETUP_VARIABLES environment variable using
+    comma-separated VAR=value pairs.
+
     Examples:
         koality run --config_path checks.yaml
 
         koality run --config_path checks.yaml -o partition_date=2023-01-01
 
-        koality run --config_path checks.yaml -o partition_date=2023-01-01 -o shop_id=SHOP02
+        koality run --config_path checks.yaml -dsv PROJECT_ID=my-gcp-project
+
+        koality run --config_path checks.yaml -dsv PROJECT_ID=prod -dsv DATASET=analytics
+
+        DATABASE_SETUP_VARIABLES="PROJECT_ID=my-project,DATASET=prod" koality run --config_path checks.yaml
 
     """
-    config = _load_config_with_overwrites(config_path, overwrites)
+    variables = _get_variables_with_env(database_setup_variable)
+    config = _load_config_with_overwrites(config_path, overwrites, variables)
     check_executor = CheckExecutor(config=config)
     _ = check_executor()
 
@@ -92,6 +120,82 @@ def _parse_overwrites(overwrites: tuple[str, ...]) -> list[tuple[str, str]]:
         path, value = overwrite.split("=", 1)
         result.append((path.strip(), value.strip()))
     return result
+
+
+def _parse_variables(variables: tuple[str, ...] | list[str]) -> dict[str, str]:
+    """Parse variable arguments into a dict.
+
+    Args:
+        variables: Tuple or list of "VAR_NAME=value" strings.
+
+    Returns:
+        Dict of variable name -> value mappings.
+
+    Raises:
+        click.BadParameter: If a variable is not in VAR_NAME=value format.
+
+    """
+    result = {}
+    for var in variables:
+        if "=" not in var:
+            msg = f"Invalid variable format: '{var}'. Expected format: VAR_NAME=value"
+            raise click.BadParameter(msg)
+        name, value = var.split("=", 1)
+        result[name.strip()] = value.strip()
+    return result
+
+
+def _parse_env_variables(env_value: str) -> dict[str, str]:
+    """Parse DATABASE_SETUP_VARIABLES environment variable.
+
+    Args:
+        env_value: Comma-separated "VAR_NAME=value" pairs.
+
+    Returns:
+        Dict of variable name -> value mappings.
+
+    Raises:
+        click.ClickException: If a variable is not in VAR_NAME=value format.
+
+    """
+    if not env_value.strip():
+        return {}
+
+    result = {}
+    for var in env_value.split(","):
+        var_stripped = var.strip()
+        if not var_stripped:
+            continue
+        if "=" not in var_stripped:
+            msg = (
+                f"Invalid variable format in {DATABASE_SETUP_VARIABLES_ENV}: '{var_stripped}'. "
+                f"Expected format: VAR1=value1,VAR2=value2"
+            )
+            raise click.ClickException(msg)
+        name, value = var_stripped.split("=", 1)
+        result[name.strip()] = value.strip()
+    return result
+
+
+def _get_variables_with_env(cli_variables: tuple[str, ...]) -> dict[str, str]:
+    """Get variables from both environment and CLI, with CLI taking precedence.
+
+    Args:
+        cli_variables: Tuple of "VAR_NAME=value" strings from CLI.
+
+    Returns:
+        Dict of variable name -> value mappings, with CLI overriding env vars.
+
+    """
+    # Start with environment variables
+    env_value = os.environ.get(DATABASE_SETUP_VARIABLES_ENV, "")
+    variables = _parse_env_variables(env_value)
+
+    # CLI variables override environment variables
+    cli_vars = _parse_variables(cli_variables)
+    variables.update(cli_vars)
+
+    return variables
 
 
 def _apply_overwrites_to_dict(config_dict: dict[str, Any], overwrites: list[tuple[str, str]]) -> None:
@@ -348,15 +452,21 @@ def _convert_value(field_name: str, value: str) -> str | bool | int | float:
     return value
 
 
-def _load_config_with_overwrites(config_path: Path, overwrites: tuple[str, ...]) -> Config:
-    """Load and parse config file, applying overwrites before validation.
+def _load_config_with_overwrites(
+    config_path: Path,
+    overwrites: tuple[str, ...],
+    variables: dict[str, str] | None = None,
+) -> Config:
+    """Load and parse config file, applying overwrites and variables before validation.
 
     Args:
         config_path: Path to the YAML configuration file.
         overwrites: Tuple of "key=value" overwrite strings.
+        variables: Dict of variable name -> value for ${VAR} substitution
+            in database_setup.
 
     Returns:
-        Parsed and validated Config object with overwrites applied.
+        Parsed and validated Config object with overwrites and variables applied.
 
     """
     config_dict = yaml.safe_load(Path(config_path).read_text())
@@ -364,6 +474,16 @@ def _load_config_with_overwrites(config_path: Path, overwrites: tuple[str, ...])
     if overwrites:
         overwrite_dict = _parse_overwrites(overwrites)
         _apply_overwrites_to_dict(config_dict, overwrite_dict)
+
+    # Apply variable substitution to database_setup
+    if "database_setup" in config_dict:
+        try:
+            config_dict["database_setup"] = substitute_variables(
+                config_dict["database_setup"],
+                variables or {},
+            )
+        except ValueError as e:
+            raise click.ClickException(str(e)) from None
 
     return Config.model_validate(config_dict)
 
@@ -428,7 +548,23 @@ def validate(config_path: Path) -> None:
     "Overwrites propagate to all checks. Can be used multiple times. "
     "Example: -o partition_date=2023-01-01 -o shop_id=SHOP02",
 )
-def print_config(config_path: Path, output_format: str, indent: int, overwrites: tuple[str, ...]) -> None:
+@click.option(
+    "--database_setup_variable",
+    "-dsv",
+    multiple=True,
+    help="Set variables for database_setup substitution. Format: VAR_NAME=value. "
+    "Variables are substituted in database_setup using ${VAR_NAME} syntax. "
+    "Can be used multiple times. Also reads from DATABASE_SETUP_VARIABLES env var "
+    "(format: VAR1=value1,VAR2=value2). CLI options override env vars. "
+    "Example: -dsv PROJECT_ID=my-gcp-project",
+)
+def print_config(
+    config_path: Path,
+    output_format: str,
+    indent: int,
+    overwrites: tuple[str, ...],
+    database_setup_variable: tuple[str, ...],
+) -> None:
     """Print the resolved koality configuration.
 
     Displays the fully resolved configuration after default propagation.
@@ -436,6 +572,11 @@ def print_config(config_path: Path, output_format: str, indent: int, overwrites:
     Filter values can be overridden using --overwrites (-o) options.
     Overwrites are applied to defaults before validation, so they
     propagate to all checks automatically.
+
+    Database setup variables can be provided using --database_setup_variable (-dsv)
+    to substitute ${VAR_NAME} placeholders in the database_setup SQL. Variables
+    can also be set via the DATABASE_SETUP_VARIABLES environment variable using
+    comma-separated VAR=value pairs.
 
     Output formats:
 
@@ -454,9 +595,14 @@ def print_config(config_path: Path, output_format: str, indent: int, overwrites:
 
         koality print --config_path checks.yaml -o partition_date=2023-01-01
 
+        koality print --config_path checks.yaml -dsv PROJECT_ID=my-gcp-project
+
+        DATABASE_SETUP_VARIABLES="PROJECT_ID=my-project" koality print --config_path checks.yaml
+
     """
+    variables = _get_variables_with_env(database_setup_variable)
     try:
-        config = _load_config_with_overwrites(config_path, overwrites)
+        config = _load_config_with_overwrites(config_path, overwrites, variables)
     except ValidationError as e:
         click.echo(f"Configuration '{config_path}' is invalid:\n{e}", err=True)
         raise SystemExit(1) from None
@@ -466,4 +612,23 @@ def print_config(config_path: Path, output_format: str, indent: int, overwrites:
     elif output_format == "json":
         click.echo(config.model_dump_json(indent=indent))
     else:  # yaml
-        click.echo(yaml.dump(config.model_dump(), default_flow_style=False, sort_keys=False, indent=indent))
+        click.echo(_dump_yaml(config.model_dump(), indent=indent))
+
+
+class _LiteralBlockDumper(yaml.SafeDumper):
+    """Custom YAML dumper that uses literal block style for multiline strings."""
+
+
+def _literal_str_representer(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
+    """Represent multiline strings using literal block style (|)."""
+    if "\n" in data:
+        return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
+    return dumper.represent_scalar("tag:yaml.org,2002:str", data)
+
+
+_LiteralBlockDumper.add_representer(str, _literal_str_representer)
+
+
+def _dump_yaml(data: dict, *, indent: int = 2) -> str:
+    """Dump data to YAML with proper multiline string handling."""
+    return yaml.dump(data, Dumper=_LiteralBlockDumper, default_flow_style=False, sort_keys=False, indent=indent)
