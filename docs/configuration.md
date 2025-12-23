@@ -547,3 +547,69 @@ check_bundles:
         value_set: ["active", "inactive", "discontinued"]
         lower_threshold: 1.0
 ```
+
+## CLI Overwrites
+
+The `--overwrites` (`-o`) option allows overriding configuration values at runtime without modifying the YAML file. This is useful for:
+
+- Running checks for a specific date instead of "yesterday"
+- Testing with different filter values
+- Temporarily changing settings like `monitor_only`
+
+### Overwrite Syntax
+
+Overwrites use a dot-notation path to target specific values, mirroring the YAML structure:
+
+```bash
+# Override filter value (targets the "value" field by default)
+koality run --config_path checks.yaml -o defaults.filters.partition_date=2023-06-15
+
+# Override filter field (column, operator, type, etc.)
+koality run --config_path checks.yaml -o defaults.filters.partition_date.column=OTHER_DATE_COL
+koality run --config_path checks.yaml -o defaults.filters.amount.operator=">="
+
+# Override other defaults
+koality run --config_path checks.yaml -o defaults.identifier_format=column_name
+koality run --config_path checks.yaml -o defaults.monitor_only=true
+
+# Multiple overwrites
+koality run --config_path checks.yaml -o defaults.filters.partition_date=2023-06-15 -o defaults.filters.shop_id=SHOP02
+```
+
+### Overwrite Levels
+
+Overwrites can target different levels of the configuration hierarchy:
+
+```bash
+# Global defaults (propagates to all checks)
+-o defaults.filters.partition_date=2023-06-15
+-o defaults.identifier_format=column_name
+
+# Bundle-level defaults (only affects that bundle's checks)
+-o check_bundles.orders.filters.partition_date=2023-06-15
+-o check_bundles.orders.identifier_format=filter_name
+
+# Check-level (only affects a specific check by index)
+-o check_bundles.orders.0.table=orders_archive
+-o check_bundles.orders.0.filters.partition_date=2023-06-15
+```
+
+### Propagation
+
+Overwrites applied to global defaults automatically propagate to all checks through the normal default inheritance mechanism. This means:
+
+```bash
+# This single overwrite...
+koality run --config_path checks.yaml -o partition_date=2023-06-15
+
+# ...affects ALL checks that inherit the partition_date filter from defaults
+```
+
+### Preview with Print
+
+Use the `print` command with overwrites to verify your overrides before running checks:
+
+```bash
+# Preview the resolved configuration with overwrites applied
+koality print --config_path checks.yaml -o partition_date=2023-06-15 --format yaml
+```

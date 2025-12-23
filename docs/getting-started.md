@@ -109,11 +109,31 @@ else:
 koality run --config_path checks.yaml
 ```
 
-You can override default configuration values via CLI arguments:
+#### Override Configuration at Runtime
+
+Use the `--overwrites` (`-o`) option to override configuration values without modifying the YAML file:
 
 ```bash
-koality run --config_path checks.yaml
+# Override a filter value (e.g., run for a specific date instead of "yesterday")
+koality run --config_path checks.yaml -o defaults.filters.partition_date=2023-06-15
+
+# Override multiple values
+koality run --config_path checks.yaml -o defaults.filters.partition_date=2023-06-15 -o defaults.filters.shop_id=SHOP02
+
+# Override other defaults
+koality run --config_path checks.yaml -o defaults.identifier_format=column_name -o defaults.monitor_only=true
+
+# Override filter fields (column, operator, etc.)
+koality run --config_path checks.yaml -o defaults.filters.partition_date.column=OTHER_DATE_COL
+
+# Override at bundle level (only affects that bundle)
+koality run --config_path checks.yaml -o check_bundles.orders_checks.filters.partition_date=2023-06-15
+
+# Override at check level (only affects specific check by index)
+koality run --config_path checks.yaml -o check_bundles.orders_checks.0.table=orders_archive
 ```
+
+Overwrites applied to global defaults propagate to all checks automatically.
 
 ### 4. Validate Configuration
 
@@ -139,7 +159,12 @@ koality print --config_path checks.yaml --format model
 
 # Custom indentation
 koality print --config_path checks.yaml --format yaml --indent 4
+
+# Preview configuration with overwrites applied
+koality print --config_path checks.yaml -o partition_date=2023-06-15
 ```
+
+Using `print` with overwrites is useful for verifying your overrides are applied correctly before running checks.
 
 ## Understanding Check Results
 
