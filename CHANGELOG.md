@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Added
+
+- **Database setup variables**: New `--database_setup_variable` (`-dsv`) option for `run` and `print` commands to substitute `${VAR_NAME}` placeholders in `database_setup` SQL. This enables dynamic configuration of database connections (e.g., different GCP projects per environment). Variables can also be provided via the `DATABASE_SETUP_VARIABLES` environment variable using comma-separated `VAR=value` pairs. CLI options override environment variables.
+
 ## [0.3.0] - 2025-12-23
 
 ### Added

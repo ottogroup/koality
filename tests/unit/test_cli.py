@@ -9,7 +9,15 @@ import pytest
 import yaml
 from click.testing import CliRunner
 
-from koality.cli import _apply_overwrites_to_dict, _parse_overwrites, cli
+from koality.cli import (
+    DATABASE_SETUP_VARIABLES_ENV,
+    _apply_overwrites_to_dict,
+    _get_variables_with_env,
+    _parse_env_variables,
+    _parse_overwrites,
+    _parse_variables,
+    cli,
+)
 
 pytestmark = pytest.mark.unit
 
@@ -903,3 +911,382 @@ class TestOverwrites:
         assert result.exit_code != 0
         assert "Bundle 'wrong_name' not found" in result.output
         assert "Available bundles: my_bundle" in result.output
+
+
+class TestDatabaseSetupVariables:
+    """Tests for the database_setup_variable functionality."""
+
+    def test_parse_variables_valid(self) -> None:
+        """Test parsing valid variable arguments."""
+        variables = ("PROJECT_ID=my-project", "DATASET=analytics")
+        result = _parse_variables(variables)
+        assert result == {"PROJECT_ID": "my-project", "DATASET": "analytics"}
+
+    def test_parse_variables_with_spaces(self) -> None:
+        """Test parsing variables with spaces around key/value."""
+        variables = ("PROJECT_ID = my-project",)
+        result = _parse_variables(variables)
+        assert result == {"PROJECT_ID": "my-project"}
+
+    def test_parse_variables_value_with_equals(self) -> None:
+        """Test parsing variables where value contains equals sign."""
+        variables = ("CONFIG=key=value",)
+        result = _parse_variables(variables)
+        assert result == {"CONFIG": "key=value"}
+
+    def test_parse_variables_invalid_format(self) -> None:
+        """Test parsing invalid variable format raises error."""
+        variables = ("invalid_no_equals",)
+        with pytest.raises(click.BadParameter, match="Invalid variable format"):
+            _parse_variables(variables)
+
+    def test_parse_variables_empty(self) -> None:
+        """Test parsing empty variables."""
+        result = _parse_variables(())
+        assert result == {}
+
+    def test_run_help_shows_database_setup_variable_option(self, runner: CliRunner) -> None:
+        """Test that run command help shows database_setup_variable option."""
+        result = runner.invoke(cli, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "--database_setup_variable" in result.output or "-dsv" in result.output
+
+    def test_print_help_shows_database_setup_variable_option(self, runner: CliRunner) -> None:
+        """Test that print command help shows database_setup_variable option."""
+        result = runner.invoke(cli, ["print", "--help"])
+        assert result.exit_code == 0
+        assert "--database_setup_variable" in result.output or "-dsv" in result.output
+
+    def test_print_with_database_setup_variable(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test print command with database_setup_variable option."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: |
+              INSTALL bigquery;
+              LOAD bigquery;
+              ATTACH 'project=${PROJECT_ID}' AS bq (TYPE bigquery);
+            database_accessor: bq
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+                "-dsv",
+                "PROJECT_ID=my-gcp-project",
+            ],
+        )
+        assert result.exit_code == 0
+        # Verify the variable was substituted
+        assert "my-gcp-project" in result.output
+        assert "${PROJECT_ID}" not in result.output
+        # Parse JSON and verify
+        parsed = json.loads(result.output)
+        assert "project=my-gcp-project" in parsed["database_setup"]
+
+    def test_print_with_multiple_database_setup_variables(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test print command with multiple database_setup_variable options."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: |
+              ATTACH 'project=${PROJECT_ID}' AS ${ACCESSOR} (TYPE bigquery);
+            database_accessor: bq
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+                "-dsv",
+                "PROJECT_ID=prod-project",
+                "-dsv",
+                "ACCESSOR=bigquery_db",
+            ],
+        )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert "project=prod-project" in parsed["database_setup"]
+        assert "bigquery_db" in parsed["database_setup"]
+
+    def test_print_with_undefined_variable_shows_error(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test print command with undefined variable shows error."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: |
+              ATTACH 'project=${PROJECT_ID}' AS bq;
+            database_accessor: bq
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        # Don't provide the required variable
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+            ],
+        )
+        assert result.exit_code != 0
+        assert "PROJECT_ID" in result.output
+        assert "not defined" in result.output
+
+    def test_print_without_variables_when_none_needed(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test print command works without variables when none are referenced."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: |
+              ATTACH 'mydb.duckdb' AS mydb;
+            database_accessor: mydb
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+            ],
+        )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert "mydb.duckdb" in parsed["database_setup"]
+
+    def test_run_with_invalid_variable_format(self, runner: CliRunner, tmp_path: Path) -> None:
+        """Test run command with invalid variable format via CLI."""
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: ""
+            database_accessor: ""
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "run",
+                "--config_path",
+                str(config_path),
+                "-dsv",
+                "invalid_no_equals",
+            ],
+        )
+        assert result.exit_code != 0
+        assert "Invalid variable format" in result.output
+
+    def test_parse_env_variables_valid(self) -> None:
+        """Test parsing valid environment variable string."""
+        result = _parse_env_variables("PROJECT_ID=my-project,DATASET=analytics")
+        assert result == {"PROJECT_ID": "my-project", "DATASET": "analytics"}
+
+    def test_parse_env_variables_with_spaces(self) -> None:
+        """Test parsing env variables with spaces."""
+        result = _parse_env_variables("PROJECT_ID = my-project , DATASET = analytics")
+        assert result == {"PROJECT_ID": "my-project", "DATASET": "analytics"}
+
+    def test_parse_env_variables_empty_string(self) -> None:
+        """Test parsing empty environment variable string."""
+        result = _parse_env_variables("")
+        assert result == {}
+
+    def test_parse_env_variables_whitespace_only(self) -> None:
+        """Test parsing whitespace-only environment variable string."""
+        result = _parse_env_variables("   ")
+        assert result == {}
+
+    def test_parse_env_variables_invalid_format(self) -> None:
+        """Test parsing invalid env variable format raises error."""
+        with pytest.raises(click.ClickException, match="Invalid variable format"):
+            _parse_env_variables("PROJECT_ID=value,invalid_no_equals")
+
+    def test_parse_env_variables_trailing_comma(self) -> None:
+        """Test parsing env variables with trailing comma."""
+        result = _parse_env_variables("PROJECT_ID=value,")
+        assert result == {"PROJECT_ID": "value"}
+
+    def test_get_variables_with_env_only_cli(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test getting variables from CLI only (no env var)."""
+        monkeypatch.delenv(DATABASE_SETUP_VARIABLES_ENV, raising=False)
+        result = _get_variables_with_env(("PROJECT_ID=cli-value",))
+        assert result == {"PROJECT_ID": "cli-value"}
+
+    def test_get_variables_with_env_only_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test getting variables from environment only (no CLI)."""
+        monkeypatch.setenv(DATABASE_SETUP_VARIABLES_ENV, "PROJECT_ID=env-value")
+        result = _get_variables_with_env(())
+        assert result == {"PROJECT_ID": "env-value"}
+
+    def test_get_variables_with_env_cli_overrides_env(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test that CLI variables override environment variables."""
+        monkeypatch.setenv(DATABASE_SETUP_VARIABLES_ENV, "PROJECT_ID=env-value,DATASET=env-dataset")
+        result = _get_variables_with_env(("PROJECT_ID=cli-value",))
+        assert result == {"PROJECT_ID": "cli-value", "DATASET": "env-dataset"}
+
+    def test_get_variables_with_env_combined(self, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test combining env and CLI variables."""
+        monkeypatch.setenv(DATABASE_SETUP_VARIABLES_ENV, "PROJECT_ID=env-project")
+        result = _get_variables_with_env(("DATASET=cli-dataset",))
+        assert result == {"PROJECT_ID": "env-project", "DATASET": "cli-dataset"}
+
+    def test_print_with_env_variable(self, runner: CliRunner, tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
+        """Test print command with environment variable."""
+        monkeypatch.setenv(DATABASE_SETUP_VARIABLES_ENV, "PROJECT_ID=env-gcp-project")
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: |
+              ATTACH 'project=${PROJECT_ID}' AS bq;
+            database_accessor: bq
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+            ],
+        )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        assert "project=env-gcp-project" in parsed["database_setup"]
+
+    def test_print_cli_overrides_env_variable(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that CLI variable overrides environment variable."""
+        monkeypatch.setenv(DATABASE_SETUP_VARIABLES_ENV, "PROJECT_ID=env-project")
+        config_yaml = dedent("""\
+            name: test_config
+            database_setup: |
+              ATTACH 'project=${PROJECT_ID}' AS bq;
+            database_accessor: bq
+
+            defaults:
+              monitor_only: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """)
+        config_path = tmp_path / "test_config.yaml"
+        config_path.write_text(config_yaml)
+
+        result = runner.invoke(
+            cli,
+            [
+                "print",
+                "--config_path",
+                str(config_path),
+                "--format",
+                "json",
+                "-dsv",
+                "PROJECT_ID=cli-project",
+            ],
+        )
+        assert result.exit_code == 0
+        parsed = json.loads(result.output)
+        # CLI should override env
+        assert "project=cli-project" in parsed["database_setup"]
+        assert "env-project" not in parsed["database_setup"]

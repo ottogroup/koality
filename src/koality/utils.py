@@ -136,3 +136,37 @@ def to_set(value: object) -> set[object]:
     if isinstance(value, set):
         return value
     return set(value)
+
+
+def substitute_variables(text: str, variables: dict[str, str]) -> str:
+    """Substitute ${VAR} placeholders in text with variable values.
+
+    Args:
+        text: The text containing ${VAR} placeholders to substitute.
+        variables: Dict of variable name -> value mappings.
+
+    Returns:
+        The text with all ${VAR} placeholders substituted.
+
+    Raises:
+        ValueError: If a variable is referenced but not defined.
+
+    Example:
+        >>> substitute_variables("project=${PROJECT_ID}", {"PROJECT_ID": "my-project"})
+        'project=my-project'
+
+    """
+    # Find all ${VAR} patterns
+    pattern = re.compile(r"\$\{([a-zA-Z_][a-zA-Z0-9_]*)\}")
+
+    def replace(match: re.Match) -> str:
+        var_name = match.group(1)
+        if var_name not in variables:
+            msg = (
+                f"Variable '${{{var_name}}}' is not defined. "
+                f"Provide it via --database_setup_variable {var_name}=<value>"
+            )
+            raise ValueError(msg)
+        return variables[var_name]
+
+    return pattern.sub(replace, text)
