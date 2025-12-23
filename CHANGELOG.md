@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.3.0] - 2025-12-23
+
 ### Added
 
 - **CLI overwrites**: New `--overwrites` (`-o`) option for `run` and `print` commands to override configuration values at runtime. Supports flexible path-based syntax:
@@ -90,6 +92,7 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.2.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.3.0...HEAD
+[0.3.0]: https://github.com/ottogroup/koality/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ottogroup/koality/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ottogroup/koality/releases/tag/v0.1.0
