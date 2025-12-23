@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.4.0] - 2025-12-23
+
 ### Added
 
 - **Database setup variables**: New `--database_setup_variable` (`-dsv`) option for `run` and `print` commands to substitute `${VAR_NAME}` placeholders in `database_setup` SQL. This enables dynamic configuration of database connections (e.g., different GCP projects per environment). Variables can also be provided via the `DATABASE_SETUP_VARIABLES` environment variable using comma-separated `VAR=value` pairs. CLI options override environment variables.
@@ -96,7 +98,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.3.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.4.0...HEAD
+[0.4.0]: https://github.com/ottogroup/koality/compare/v0.3.0...v0.4.0
 [0.3.0]: https://github.com/ottogroup/koality/compare/v0.2.0...v0.3.0
 [0.2.0]: https://github.com/ottogroup/koality/compare/v0.1.0...v0.2.0
 [0.1.0]: https://github.com/ottogroup/koality/releases/tag/v0.1.0
