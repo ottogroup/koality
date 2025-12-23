@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Changed
+
+- **BREAKING**: Removed `offset` property from filter configuration. Date offsets are now specified inline in the value string (e.g., `yesterday-2`, `today+1`, `tomorrow-3`). This simplifies configuration and makes the offset more visible at the point of use.
+
 ## [0.2.0] - 2025-12-23
 
 ### Added

@@ -29,7 +29,8 @@ class FilterConfig(BaseModel):
         column: The database column name to filter on.
         value: The filter value (can be any type, will be converted to string in SQL).
             For IN/NOT IN operators, use a list of values.
-            For date filters, supports relative dates like "today", "yesterday", etc.
+            For date filters, supports relative dates like "today", "yesterday",
+            and offsets like "yesterday-2" or "today+1".
         operator: SQL comparison operator. Defaults to "=" (equality).
         type: Filter type - "date" for date filters (used for rolling checks),
             "identifier" for identifier filters (e.g., shop_id),
@@ -38,22 +39,20 @@ class FilterConfig(BaseModel):
             When type="date", the value is automatically parsed as a date.
         parse_as_date: If True, the value will be parsed as a date even for type="other".
             Useful for filters that need date parsing but aren't the primary date filter.
-        offset: Number of days to offset the date (only used when type="date" or parse_as_date=True).
 
     Example:
         filters:
           partition_date:
             column: BQ_PARTITIONTIME
-            value: yesterday
+            value: yesterday-2  # 2 days before yesterday
             type: date
-            offset: 0  # optional
           shop_id:
             column: shopId
             value: EC0601
             type: identifier
           created_at:
             column: created_date
-            value: today
+            value: today+1  # tomorrow
             parse_as_date: true  # parses date but doesn't count as the "date" filter
           revenue:
             column: total_revenue
@@ -67,7 +66,6 @@ class FilterConfig(BaseModel):
     operator: FilterOperator = "="
     type: FilterType = "other"
     parse_as_date: bool = False
-    offset: int = 0
 
     @model_validator(mode="after")
     def validate_operator_value_combination(self) -> Self:

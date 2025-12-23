@@ -254,9 +254,8 @@ class DataQualityCheck(abc.ABC):
             filters:
               partition_date:
                 column: BQ_PARTITIONTIME
-                value: yesterday
+                value: yesterday-2  # 2 days before yesterday
                 type: date  # auto-parses value as date
-                offset: 0   # optional days offset
               shop_id:
                 column: shopId
                 value: EC0601
@@ -295,7 +294,7 @@ class DataQualityCheck(abc.ABC):
             # Auto-parse date values when type is "date" or parse_as_date is True
             should_parse = filter_type == "date" or config_dict.get("parse_as_date", False)
             if should_parse and value is not None:
-                value = parse_date(str(value), offset_days=config_dict.get("offset", 0))
+                value = parse_date(str(value))
 
             operator = config_dict.get("operator", "=")
 

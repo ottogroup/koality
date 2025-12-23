@@ -33,7 +33,6 @@ defaults:                       # Global default settings
       type: date | identifier | other  # Filter type
       operator: string          # Comparison operator (default: "=")
       parse_as_date: bool       # Parse value as date (default: false)
-      offset: int               # Days offset for date parsing (default: 0)
 
 check_bundles:                  # List of check bundles
   - name: string                # Bundle name
@@ -100,23 +99,23 @@ When using BigQuery, Koality automatically:
 
 Global defaults are applied to all checks unless overridden at the bundle or check level.
 
-| Field               | Type   | Description                                          |
-|---------------------|--------|------------------------------------------------------|
-| `monitor_only`      | bool   | If `true`, check failures don't fail the overall run |
-| `result_table`      | string | Table name for persisting check results              |
-| `log_path`          | string | File path to write failed checks log                 |
-| `identifier_format` | string | How to format identifier in output (see below)       |
+| Field               | Type   | Description                                                   |
+|---------------------|--------|---------------------------------------------------------------|
+| `monitor_only`      | bool   | If `true`, check failures don't fail the overall run          |
+| `result_table`      | string | Table name for persisting check results                       |
+| `log_path`          | string | File path to write failed checks log                          |
+| `identifier_format` | string | How to format identifier in output (see below)                |
 | `filters`           | object | Default filters applied to all checks (see Filtering section) |
 
 ### Identifier Format
 
 The `identifier_format` option controls how the identifier filter value appears in check results and messages. Three options are available:
 
-| Format          | Result Column | Value Format           | Example                    |
-|-----------------|---------------|------------------------|----------------------------|
-| `identifier`    | `IDENTIFIER`  | `column=value`         | `shop_code=SHOP001`        |
-| `filter_name`   | Filter name   | Value only             | Column: `SHOP_ID`, Value: `SHOP001` |
-| `column_name`   | Column name   | Value only             | Column: `SHOP_CODE`, Value: `SHOP001` |
+| Format        | Result Column | Value Format   | Example                               |
+|---------------|---------------|----------------|---------------------------------------|
+| `identifier`  | `IDENTIFIER`  | `column=value` | `shop_code=SHOP001`                   |
+| `filter_name` | Filter name   | Value only     | Column: `SHOP_ID`, Value: `SHOP001`   |
+| `column_name` | Column name   | Value only     | Column: `SHOP_CODE`, Value: `SHOP001` |
 
 **Default**: `identifier`
 
@@ -323,14 +322,13 @@ Checks support filtering using a structured `filters` configuration:
 
 Each filter has the following properties:
 
-| Property        | Type   | Required | Description                                                                                   |
-|-----------------|--------|----------|-----------------------------------------------------------------------------------------------|
-| `column`        | string | Yes*     | The database column name to filter on                                                         |
-| `value`         | any    | Yes*     | The filter value (string, number, list for IN operators, or `null` for IS NULL)              |
-| `operator`      | string | No       | SQL operator: `=`, `!=`, `>`, `>=`, `<`, `<=`, `IN`, `NOT IN`, `LIKE`. Default: `=`          |
-| `type`          | string | No       | Filter type: `date`, `identifier`, or `other`. Default: `other`                              |
-| `parse_as_date` | bool   | No       | If `true`, parse the value as a date (supports relative dates). Default: `false`             |
-| `offset`        | int    | No       | Days to offset the date (only when `type: date` or `parse_as_date: true`). Default: `0`      |
+| Property        | Type   | Required | Description                                                                                                                            |
+|-----------------|--------|----------|----------------------------------------------------------------------------------------------------------------------------------------|
+| `column`        | string | Yes*     | The database column name to filter on                                                                                                  |
+| `value`         | any    | Yes*     | The filter value (string, number, list for IN operators, or `null` for IS NULL). For dates, supports inline offsets like `yesterday-2` |
+| `operator`      | string | No       | SQL operator: `=`, `!=`, `>`, `>=`, `<`, `<=`, `IN`, `NOT IN`, `LIKE`. Default: `=`                                                    |
+| `type`          | string | No       | Filter type: `date`, `identifier`, or `other`. Default: `other`                                                                        |
+| `parse_as_date` | bool   | No       | If `true`, parse the value as a date (supports relative dates). Default: `false`                                                       |
 
 *`column` and `value` are optional in defaults (global or bundle level) but must be set after merging. This allows defining partial filters in defaults that are completed at the check level.
 
@@ -338,11 +336,11 @@ Each filter has the following properties:
 
 Koality supports three filter types:
 
-| Type         | Purpose                                      | Limit      |
-|--------------|----------------------------------------------|------------|
+| Type         | Purpose                                      | Limit         |
+|--------------|----------------------------------------------|---------------|
 | `date`       | Date filter for rolling checks               | One per check |
 | `identifier` | Identifier for grouping results (e.g., shop) | One per check |
-| `other`      | Regular filters                              | Unlimited  |
+| `other`      | Regular filters                              | Unlimited     |
 
 ### Identifier Filters
 
@@ -364,15 +362,14 @@ When `type: date` is set, the value is automatically parsed as a date. Supported
 
 - **ISO dates**: `2024-01-15`, `20240115`
 - **Relative dates**: `today`, `yesterday`, `tomorrow`
-- **With offset**: Use the `offset` property to add/subtract days
+- **With inline offset**: `today-2`, `yesterday+1`, `tomorrow-3` (add or subtract days directly in the value)
 
 ```yaml
 filters:
   partition_date:
     column: BQ_PARTITIONTIME
-    value: yesterday      # Automatically parsed to ISO date
+    value: yesterday-1    # 2 days ago (yesterday minus 1 day)
     type: date
-    offset: -1            # Go back one more day (2 days ago total)
 ```
 
 **Important**: Only one filter with `type: date` is allowed per check. This is the filter used by rolling checks (`RollingValuesInSetCheck`, `RelCountChangeCheck`, `IqrOutlierCheck`) for their date-based calculations.
@@ -387,9 +384,8 @@ filters:
     type: date              # THE date filter for rolling checks
   created_after:
     column: created_at
-    value: today
+    value: today-7          # 7 days ago
     parse_as_date: true     # Also parses date, but isn't "the" date filter
-    offset: -7              # 7 days ago
     operator: ">="
 ```
 
