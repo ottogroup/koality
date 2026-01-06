@@ -358,6 +358,7 @@ def test_data_existence_cache(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConn
 
     # Track data_check calls by patching execute_query
     from unittest.mock import patch
+
     from koality.utils import execute_query
 
     data_check_query_calls = []
@@ -380,9 +381,7 @@ def test_data_existence_cache(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConn
     assert not executor.check_failed
 
 
-def test_data_existence_cache_different_datasets(
-    tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection
-) -> None:
+def test_data_existence_cache_different_datasets(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
     """Test that cache is properly partitioned for different datasets."""
     content = dedent(
         f"""
@@ -430,6 +429,7 @@ def test_data_existence_cache_different_datasets(
 
     # Track data_check calls by patching execute_query
     from unittest.mock import patch
+
     from koality.utils import execute_query
 
     data_check_query_calls = []

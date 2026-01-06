@@ -99,7 +99,7 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "src/koality/checks.py" = ["S608"]
-"tests/*" = ["S101", "PLR2004"]
+"tests/*" = ["S101", "PLR2004", "ANN001", "ANN202", "PLC0415", "SLF001"]
 
 [tool.pytest.ini_options]
 log_level = "DEBUG"
