@@ -7,6 +7,7 @@ from unittest.mock import MagicMock, patch
 import pytest
 from pydantic_yaml import parse_yaml_raw_as
 
+from koality.checks import CountCheck, NullRatioCheck
 from koality.executor import CheckExecutor
 from koality.models import Config
 
@@ -165,8 +166,6 @@ def test_progress_bar_multiple_bundles() -> None:
 @pytest.mark.unit
 def test_cache_key_generation() -> None:
     """Test that cache keys are generated correctly for check instances."""
-    from koality.checks import NullRatioCheck
-
     # Create two check instances with same parameters
     check1 = NullRatioCheck(
         database_accessor="project.dataset",
@@ -203,9 +202,9 @@ def test_cache_key_generation() -> None:
     )
 
     # Generate cache keys
-    key1 = CheckExecutor._get_dataset_cache_key(check1)
-    key2 = CheckExecutor._get_dataset_cache_key(check2)
-    key3 = CheckExecutor._get_dataset_cache_key(check3)
+    key1 = CheckExecutor._get_dataset_cache_key(check1)  # noqa: SLF001
+    key2 = CheckExecutor._get_dataset_cache_key(check2)  # noqa: SLF001
+    key3 = CheckExecutor._get_dataset_cache_key(check3)  # noqa: SLF001
 
     # Checks 1 and 2 should have the same cache key (same dataset)
     assert key1 == key2
@@ -217,8 +216,6 @@ def test_cache_key_generation() -> None:
 @pytest.mark.unit
 def test_cache_key_with_no_filters() -> None:
     """Test cache key generation when no filters are present."""
-    from koality.checks import CountCheck
-
     check = CountCheck(
         database_accessor="project.dataset",
         database_provider=None,
@@ -227,7 +224,7 @@ def test_cache_key_with_no_filters() -> None:
         filters={},
     )
 
-    key = CheckExecutor._get_dataset_cache_key(check)
+    key = CheckExecutor._get_dataset_cache_key(check)  # noqa: SLF001
 
     # Should return a valid tuple
     assert isinstance(key, tuple)

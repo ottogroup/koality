@@ -9,7 +9,21 @@ import pytest
 from pydantic_yaml import parse_yaml_raw_as
 
 from koality.executor import CheckExecutor
-from koality.models import Config
+from koality.models import Config, DatabaseProvider
+from koality.utils import execute_query
+
+
+def track_query(
+    query: str,
+    client: duckdb.DuckDBPyConnection,
+    provider: DatabaseProvider,
+    data_check_query_calls: list[str],
+) -> duckdb.DuckDBPyRelation:
+    """Track queries that check for data existence."""
+    if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
+        data_check_query_calls.append(query)
+    return execute_query(query, client, provider)
+
 
 pytestmark = pytest.mark.integration
 
@@ -357,19 +371,12 @@ def test_data_existence_cache(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConn
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
 
     # Track data_check calls by patching execute_query
-    from unittest.mock import patch
-
-    from koality.utils import execute_query
-
     data_check_query_calls = []
 
-    def track_query(query, client, provider):
-        """Track queries that check for data existence."""
-        if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
-            data_check_query_calls.append(query)
-        return execute_query(query, client, provider)
-
-    with patch("koality.checks.execute_query", side_effect=track_query):
+    with patch(
+        "koality.checks.execute_query",
+        side_effect=lambda query, client, provider: track_query(query, client, provider, data_check_query_calls),
+    ):
         result_dict = executor()
 
     # All 3 checks are on the same dataset (table, date, filters)
@@ -428,19 +435,12 @@ def test_data_existence_cache_different_datasets(tmp_path: Path, duckdb_client: 
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
 
     # Track data_check calls by patching execute_query
-    from unittest.mock import patch
-
-    from koality.utils import execute_query
-
     data_check_query_calls = []
 
-    def track_query(query, client, provider):
-        """Track queries that check for data existence."""
-        if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
-            data_check_query_calls.append(query)
-        return execute_query(query, client, provider)
-
-    with patch("koality.checks.execute_query", side_effect=track_query):
+    with patch(
+        "koality.checks.execute_query",
+        side_effect=lambda query, client, provider: track_query(query, client, provider, data_check_query_calls),
+    ):
         result_dict = executor()
 
     # Two checks with different shop filters = different datasets
