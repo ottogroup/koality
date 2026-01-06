@@ -82,7 +82,7 @@ docs = [
     "mike>=1.1.2,<3",
     "mkdocs>=1.4.3,<2",
     "mkdocs-material>=9.1.15,<10",
-    "mkdocstrings-python>=1.1.2,<2",
+    "mkdocstrings-python>=1.1.2,<3",
 ]
 
 [tool.ruff]
