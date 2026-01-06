@@ -11,6 +11,8 @@ from pydantic_yaml import parse_yaml_raw_as
 from koality.executor import CheckExecutor
 from koality.models import Config
 
+pytestmark = pytest.mark.integration
+
 
 @pytest.fixture
 def duckdb_client() -> duckdb.DuckDBPyConnection:

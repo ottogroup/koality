@@ -126,7 +126,7 @@ check_githubactions = "zizmor .github/workflows/"
 # Testing.
 test_unit = "pytest -m unit"
 test_integration = "pytest -m integration"
-test = ["test_unit", "test_integration"]
+test = "pytest" # runs all tests
 # Docs
 docs_serve = "mkdocs serve"
 
