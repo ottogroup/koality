@@ -19,6 +19,7 @@ Types of changes:
 ### Added
 
 - Add progress bar for check execution
+- **Data existence check caching**: Implement caching mechanism in `CheckExecutor` to eliminate redundant data existence queries when multiple checks operate on the same dataset (same table, date, and filters). The cache is automatically managed per executor instance and can significantly improve performance - e.g., 10 checks on the same dataset now execute only 1 data existence query instead of 10 (90% reduction)
 
 ### Changed
 

@@ -123,10 +123,84 @@ class CheckExecutor:
         self.persist_results = self.config.defaults.persist_results
         self.log_path = self.config.defaults.log_path
 
+        self._data_existence_cache: dict[tuple, dict] = {}
+
     @staticmethod
     def aggregate_values(value_list: list[str]) -> str:
         """Join a list of values into a comma-separated, sorted, deduplicated string."""
         return ", ".join(sorted(set(value_list)))
+
+    @staticmethod
+    def _get_dataset_cache_key(check_instance: DataQualityCheck) -> tuple:
+        """Generate a unique cache key for data existence checks.
+
+        The cache key is based on attributes that uniquely identify a dataset:
+        - table name
+        - database_accessor
+        - date from date_filter (if present)
+        - filters that affect data existence
+
+        Args:
+            check_instance: The check instance to generate a cache key for
+
+        Returns:
+            A hashable tuple representing the unique dataset identifier
+
+        """
+        # Get the table name
+        table = check_instance.table
+
+        # Get database accessor
+        database_accessor = check_instance.database_accessor or ""
+
+        # Get date from date_filter
+        date_value = None
+        if check_instance.date_filter:
+            date_value = check_instance.date_filter.get("value")
+
+        # Convert filters dict to a frozenset for hashability
+        # We only need filters that affect data existence (all of them)
+        filters_items = []
+        if check_instance.filters:
+            for filter_name, filter_config in sorted(check_instance.filters.items()):
+                # Create a hashable representation of each filter
+                filter_tuple = (
+                    filter_name,
+                    filter_config.get("column"),
+                    str(filter_config.get("value")),
+                    filter_config.get("operator"),
+                    filter_config.get("type"),
+                )
+                filters_items.append(filter_tuple)
+
+        # Special handling for MatchRateCheck which has table-specific filters
+        # These are used in the data existence query and must be part of the cache key
+        if hasattr(check_instance, "filters_left") and hasattr(check_instance, "filters_right"):
+            # Add left table filters
+            for filter_name, filter_config in sorted(check_instance.filters_left.items()):
+                filter_tuple = (
+                    f"left_{filter_name}",
+                    filter_config.get("column"),
+                    str(filter_config.get("value")),
+                    filter_config.get("operator"),
+                    filter_config.get("type"),
+                )
+                filters_items.append(filter_tuple)
+
+            # Add right table filters
+            for filter_name, filter_config in sorted(check_instance.filters_right.items()):
+                filter_tuple = (
+                    f"right_{filter_name}",
+                    filter_config.get("column"),
+                    str(filter_config.get("value")),
+                    filter_config.get("operator"),
+                    filter_config.get("type"),
+                )
+                filters_items.append(filter_tuple)
+
+        filters_key = frozenset(filters_items)
+
+        return (table, database_accessor, date_value, filters_key)
 
     def execute_checks(self) -> None:
         """Instantiate and execute all checks.
@@ -151,7 +225,21 @@ class CheckExecutor:
                     check_instance = check_factory(**check_kwargs)
                     self.checks.append(check_instance)
 
-                    results.append(check_instance(self.duckdb_client))
+                    # Check cache before running data_check
+                    cache_key = self._get_dataset_cache_key(check_instance)
+                    if cache_key not in self._data_existence_cache:
+                        data_check_result = check_instance.data_check(self.duckdb_client)
+                        self._data_existence_cache[cache_key] = data_check_result
+                    else:
+                        data_check_result = self._data_existence_cache[cache_key]
+
+                    # If data_check returned a result (data missing), use it
+                    if data_check_result:
+                        results.append(data_check_result)
+                    else:
+                        # Otherwise run the actual check
+                        results.append(check_instance.check(self.duckdb_client))
+
                     pbar.update(1)
 
         for check in self.checks:
