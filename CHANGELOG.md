@@ -23,6 +23,7 @@ Types of changes:
 ### Changed
 
 - Refactor database provider handling in executor.py
+- Update dependency versions to enforce upper limits
 
 ## [0.4.1] - 2025-12-23
 
