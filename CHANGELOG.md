@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Changed
+
+- Refactor database provider handling in executor.py
+
 ## [0.4.1] - 2025-12-23
 
 ### Fixed

@@ -106,6 +106,9 @@ class CheckExecutor:
         else:
             self.duckdb_client = duckdb.connect(":memory:")
             self.duckdb_client.query(self.config.database_setup)
+        self.database_provider = None
+        if self.config.database_accessor:
+            self.database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
 
         self.kwargs = kwargs
 
@@ -132,15 +135,12 @@ class CheckExecutor:
         are stored in a results dict for further processing.
         """
         results = []
-        database_provider = None
-        if self.config.database_accessor:
-            database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
         for check_bundle in self.config.check_bundles:
             for check_config in check_bundle.checks:
                 check_factory = CHECK_MAP[check_config.check_type]
                 check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_unset=True)
                 check_kwargs["database_accessor"] = self.config.database_accessor
-                check_kwargs["database_provider"] = database_provider
+                check_kwargs["database_provider"] = self.database_provider
                 check_kwargs["identifier_format"] = self.config.defaults.identifier_format
                 check_instance = check_factory(**check_kwargs)
                 self.checks.append(check_instance)
@@ -292,19 +292,18 @@ class CheckExecutor:
             row["INSERT_TIMESTAMP"] = now
 
         if self.config.database_accessor:
-            database_provider = identify_database_provider(self.duckdb_client, self.config.database_accessor)
             query_create_or_replace_table = f"""
                 CREATE TABLE IF NOT EXISTS {self.result_table} (
-                    DATE {DATA_TYPES["DATE"][database_provider.type]},
-                    METRIC_NAME {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    `TABLE` {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    {identifier_column} {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    `COLUMN` {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    VALUE {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
-                    UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][database_provider.type]},
-                    RESULT {DATA_TYPES["VARCHAR"][database_provider.type]},
-                    INSERT_TIMESTAMP {DATA_TYPES["TIMESTAMP"][database_provider.type]} DEFAULT CURRENT_TIMESTAMP
+                    DATE {DATA_TYPES["DATE"][self.database_provider.type]},
+                    METRIC_NAME {DATA_TYPES["VARCHAR"][self.database_provider.type]},
+                    `TABLE` {DATA_TYPES["VARCHAR"][self.database_provider.type]},
+                    {identifier_column} {DATA_TYPES["VARCHAR"][self.database_provider.type]},
+                    `COLUMN` {DATA_TYPES["VARCHAR"][self.database_provider.type]},
+                    VALUE {DATA_TYPES["VARCHAR"][self.database_provider.type]},
+                    LOWER_THRESHOLD {DATA_TYPES["NUMERIC"][self.database_provider.type]},
+                    UPPER_THRESHOLD {DATA_TYPES["NUMERIC"][self.database_provider.type]},
+                    RESULT {DATA_TYPES["VARCHAR"][self.database_provider.type]},
+                    INSERT_TIMESTAMP {DATA_TYPES["TIMESTAMP"][self.database_provider.type]} DEFAULT CURRENT_TIMESTAMP
                 )
             """
             try:
@@ -312,7 +311,7 @@ class CheckExecutor:
                 execute_query(
                     query_create_or_replace_table,
                     self.duckdb_client,
-                    database_provider,
+                    self.database_provider,
                 )
             except duckdb.Error as e:
                 msg = f"Could not create or replace table {self.result_table}"
@@ -347,7 +346,7 @@ class CheckExecutor:
                 execute_query(
                     query_insert_values_into_result_table,
                     self.duckdb_client,
-                    database_provider,
+                    self.database_provider,
                 )
             except duckdb.Error as e:
                 msg = f"Could not insert rows into table {self.result_table}"
