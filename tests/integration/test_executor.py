@@ -2,6 +2,7 @@
 
 from pathlib import Path
 from textwrap import dedent
+from unittest.mock import patch
 
 import duckdb
 import pytest
@@ -280,3 +281,28 @@ def test_executor_regex_match_check(tmp_path: Path, duckdb_client: duckdb.DuckDB
     result = {item["METRIC_NAME"] for item in result_dict}
     assert "product_number_regex_match_ratio" in result
     assert not executor.check_failed
+
+
+def test_executor_progress_bar(config_file_success: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that progress bar is displayed during check execution."""
+    config = parse_yaml_raw_as(Config, config_file_success.read_text())
+    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
+
+    with patch("koality.executor.tqdm") as mock_tqdm:
+        # Setup mock to return a context manager
+        mock_pbar = mock_tqdm.return_value.__enter__.return_value
+
+        executor()
+
+        # Verify tqdm was called with correct parameters
+        mock_tqdm.assert_called_once()
+        call_kwargs = mock_tqdm.call_args.kwargs
+        assert call_kwargs["total"] == 4  # config_file_success has 4 checks (2 bundles x 2 checks each)
+        assert call_kwargs["desc"] == "Executing checks"
+        assert call_kwargs["unit"] == "check"
+
+        # Verify progress bar was updated 4 times (once per check)
+        assert mock_pbar.update.call_count == 4
+        # Each update should increment by 1
+        for call in mock_pbar.update.call_args_list:
+            assert call[0][0] == 1
