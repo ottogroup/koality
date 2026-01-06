@@ -6,6 +6,7 @@ from collections import defaultdict
 from pathlib import Path
 
 import duckdb
+from tqdm import tqdm
 
 from koality.checks import (
     AverageCheck,
@@ -135,17 +136,23 @@ class CheckExecutor:
         are stored in a results dict for further processing.
         """
         results = []
-        for check_bundle in self.config.check_bundles:
-            for check_config in check_bundle.checks:
-                check_factory = CHECK_MAP[check_config.check_type]
-                check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_unset=True)
-                check_kwargs["database_accessor"] = self.config.database_accessor
-                check_kwargs["database_provider"] = self.database_provider
-                check_kwargs["identifier_format"] = self.config.defaults.identifier_format
-                check_instance = check_factory(**check_kwargs)
-                self.checks.append(check_instance)
 
-                results.append(check_instance(self.duckdb_client))
+        # Calculate total number of checks
+        total_checks = sum(len(check_bundle.checks) for check_bundle in self.config.check_bundles)
+
+        with tqdm(total=total_checks, desc="Executing checks", unit="check") as pbar:
+            for check_bundle in self.config.check_bundles:
+                for check_config in check_bundle.checks:
+                    check_factory = CHECK_MAP[check_config.check_type]
+                    check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_unset=True)
+                    check_kwargs["database_accessor"] = self.config.database_accessor
+                    check_kwargs["database_provider"] = self.database_provider
+                    check_kwargs["identifier_format"] = self.config.defaults.identifier_format
+                    check_instance = check_factory(**check_kwargs)
+                    self.checks.append(check_instance)
+
+                    results.append(check_instance(self.duckdb_client))
+                    pbar.update(1)
 
         for check in self.checks:
             if check.status in ("FAIL", "ERROR"):

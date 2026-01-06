@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Added
+
+- Add progress bar for check execution
+
 ### Changed
 
 - Refactor database provider handling in executor.py
