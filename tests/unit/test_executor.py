@@ -160,3 +160,78 @@ def test_progress_bar_multiple_bundles() -> None:
 
             # Verify update was called 5 times
             assert mock_pbar.update.call_count == 5
+
+
+@pytest.mark.unit
+def test_cache_key_generation() -> None:
+    """Test that cache keys are generated correctly for check instances."""
+    from koality.checks import NullRatioCheck
+
+    # Create two check instances with same parameters
+    check1 = NullRatioCheck(
+        database_accessor="project.dataset",
+        database_provider=None,
+        table="test_table",
+        check_column="value",
+        filters={
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+            "shop": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+        },
+    )
+
+    check2 = NullRatioCheck(
+        database_accessor="project.dataset",
+        database_provider=None,
+        table="test_table",
+        check_column="other_value",  # Different column, but same dataset
+        filters={
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+            "shop": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+        },
+    )
+
+    # Create a check with different date
+    check3 = NullRatioCheck(
+        database_accessor="project.dataset",
+        database_provider=None,
+        table="test_table",
+        check_column="value",
+        filters={
+            "date": {"column": "DATE", "value": "2023-01-02", "type": "date"},
+            "shop": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+        },
+    )
+
+    # Generate cache keys
+    key1 = CheckExecutor._get_dataset_cache_key(check1)
+    key2 = CheckExecutor._get_dataset_cache_key(check2)
+    key3 = CheckExecutor._get_dataset_cache_key(check3)
+
+    # Checks 1 and 2 should have the same cache key (same dataset)
+    assert key1 == key2
+
+    # Check 3 should have a different cache key (different date)
+    assert key1 != key3
+
+
+@pytest.mark.unit
+def test_cache_key_with_no_filters() -> None:
+    """Test cache key generation when no filters are present."""
+    from koality.checks import CountCheck
+
+    check = CountCheck(
+        database_accessor="project.dataset",
+        database_provider=None,
+        table="test_table",
+        check_column="*",
+        filters={},
+    )
+
+    key = CheckExecutor._get_dataset_cache_key(check)
+
+    # Should return a valid tuple
+    assert isinstance(key, tuple)
+    assert key[0] == "test_table"
+    assert key[1] == "project.dataset"
+    assert key[2] is None  # No date filter
+    assert key[3] == frozenset()  # Empty filters

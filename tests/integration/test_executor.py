@@ -308,3 +308,145 @@ def test_executor_progress_bar(config_file_success: Path, duckdb_client: duckdb.
         # Each update should increment by 1
         for call in mock_pbar.update.call_args_list:
             assert call[0][0] == 1
+
+
+def test_data_existence_cache(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that data existence checks are cached for checks on the same dataset."""
+    content = dedent(
+        f"""
+        name: koality-cache-test
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+          log_path: {tmp_path}/message.txt
+
+        check_bundles:
+          - name: check-bundle-1
+            defaults:
+              table: dummy_table
+              filters:
+                date:
+                  column: DATE
+                  value: "2023-01-01"
+                  type: date
+                shop:
+                  column: shop_code
+                  value: SHOP001
+                  type: identifier
+            checks:
+              - check_type: NullRatioCheck
+                check_column: value
+                lower_threshold: 0
+                upper_threshold: 1
+              - check_type: CountCheck
+                check_column: "*"
+                lower_threshold: 0
+                upper_threshold: 1000
+              - check_type: RegexMatchCheck
+                check_column: product_number
+                regex_to_match: 'SHOP\\d{{3}}-.*'
+                lower_threshold: 0.99
+                upper_threshold: 1.0
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
+
+    # Track data_check calls by patching execute_query
+    from unittest.mock import patch
+    from koality.utils import execute_query
+
+    data_check_query_calls = []
+
+    def track_query(query, client, provider):
+        """Track queries that check for data existence."""
+        if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
+            data_check_query_calls.append(query)
+        return execute_query(query, client, provider)
+
+    with patch("koality.checks.execute_query", side_effect=track_query):
+        result_dict = executor()
+
+    # All 3 checks are on the same dataset (table, date, filters)
+    # So data_check query should only be executed once (cached for subsequent checks)
+    assert len(data_check_query_calls) == 1
+
+    # Verify all checks executed successfully
+    assert len(result_dict) == 3
+    assert not executor.check_failed
+
+
+def test_data_existence_cache_different_datasets(
+    tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection
+) -> None:
+    """Test that cache is properly partitioned for different datasets."""
+    content = dedent(
+        f"""
+        name: koality-cache-different-datasets
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+          log_path: {tmp_path}/message.txt
+
+        check_bundles:
+          - name: check-bundle-1
+            defaults:
+              check_type: CountCheck
+              table: dummy_table
+              check_column: "*"
+              lower_threshold: 0
+              upper_threshold: 1000
+            checks:
+              - filters:
+                  date:
+                    column: DATE
+                    value: "2023-01-01"
+                    type: date
+                  shop:
+                    column: shop_code
+                    value: SHOP001
+                    type: identifier
+              - filters:
+                  date:
+                    column: DATE
+                    value: "2023-01-01"
+                    type: date
+                  shop:
+                    column: shop_code
+                    value: SHOP002
+                    type: identifier
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
+
+    # Track data_check calls by patching execute_query
+    from unittest.mock import patch
+    from koality.utils import execute_query
+
+    data_check_query_calls = []
+
+    def track_query(query, client, provider):
+        """Track queries that check for data existence."""
+        if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
+            data_check_query_calls.append(query)
+        return execute_query(query, client, provider)
+
+    with patch("koality.checks.execute_query", side_effect=track_query):
+        result_dict = executor()
+
+    # Two checks with different shop filters = different datasets
+    # So data_check query should be executed twice (once per unique dataset)
+    assert len(data_check_query_calls) == 2
+
+    # Verify all checks executed successfully
+    assert len(result_dict) == 2
+    assert not executor.check_failed
