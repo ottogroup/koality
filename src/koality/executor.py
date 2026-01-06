@@ -173,6 +173,31 @@ class CheckExecutor:
                 )
                 filters_items.append(filter_tuple)
 
+        # Special handling for MatchRateCheck which has table-specific filters
+        # These are used in the data existence query and must be part of the cache key
+        if hasattr(check_instance, "filters_left") and hasattr(check_instance, "filters_right"):
+            # Add left table filters
+            for filter_name, filter_config in sorted(check_instance.filters_left.items()):
+                filter_tuple = (
+                    f"left_{filter_name}",
+                    filter_config.get("column"),
+                    str(filter_config.get("value")),
+                    filter_config.get("operator"),
+                    filter_config.get("type"),
+                )
+                filters_items.append(filter_tuple)
+
+            # Add right table filters
+            for filter_name, filter_config in sorted(check_instance.filters_right.items()):
+                filter_tuple = (
+                    f"right_{filter_name}",
+                    filter_config.get("column"),
+                    str(filter_config.get("value")),
+                    filter_config.get("operator"),
+                    filter_config.get("type"),
+                )
+                filters_items.append(filter_tuple)
+
         filters_key = frozenset(filters_items)
 
         return (table, database_accessor, date_value, filters_key)
