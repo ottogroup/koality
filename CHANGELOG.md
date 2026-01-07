@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-01-07
+
 ### Added
 
 - Add format_threshold utility to handle SQL threshold values and update executor to use it
@@ -124,7 +126,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.5.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.6.0...HEAD
+[0.6.0]: https://github.com/ottogroup/koality/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ottogroup/koality/compare/v0.4.1...v0.5.0
 [0.4.1]: https://github.com/ottogroup/koality/compare/v0.4.0...v0.4.1
 [0.4.0]: https://github.com/ottogroup/koality/compare/v0.3.0...v0.4.0
