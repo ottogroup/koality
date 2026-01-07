@@ -26,7 +26,7 @@ from koality.checks import (
 )
 from koality.exceptions import DatabaseError
 from koality.models import CHECK_TYPE, Config
-from koality.utils import execute_query, identify_database_provider
+from koality.utils import execute_query, format_threshold, identify_database_provider
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -413,6 +413,7 @@ class CheckExecutor:
                 raise DatabaseError(msg) from e
 
             # Convert results_with_it to VALUES clause
+
             values_clause = ", ".join(
                 [
                     f"""
@@ -423,8 +424,8 @@ class CheckExecutor:
                         '{row[identifier_column]}',
                         {f"'{row['COLUMN']}'" if row["COLUMN"] is not None else "NULL"},
                         {row["VALUE"] if row["VALUE"] is not None else "NULL"},
-                        {row["LOWER_THRESHOLD"] if row["LOWER_THRESHOLD"] is not None else "NULL"},
-                        {row["UPPER_THRESHOLD"] if row["UPPER_THRESHOLD"] is not None else "NULL"},
+                        {format_threshold(row["LOWER_THRESHOLD"])},
+                        {format_threshold(row["UPPER_THRESHOLD"])},
                         '{row["RESULT"]}',
                         '{row["INSERT_TIMESTAMP"]}'
                     )

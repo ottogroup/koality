@@ -2,6 +2,7 @@
 
 import contextlib
 import datetime as dt
+import math
 import re
 from ast import literal_eval
 from collections.abc import Iterable
@@ -170,3 +171,36 @@ def substitute_variables(text: str, variables: dict[str, str]) -> str:
         return variables[var_name]
 
     return pattern.sub(replace, text)
+
+
+def format_threshold(value: float | None) -> str:
+    """Format threshold values for SQL insertion, handling infinity appropriately.
+
+    Args:
+        value: The threshold value to format (can be None, finite, or infinite).
+
+    Returns:
+        String representation suitable for SQL VALUES clause:
+        - "NULL" for None
+        - "'+Infinity'" for positive infinity
+        - "'-Infinity'" for negative infinity
+        - String representation for finite numbers
+
+    Example:
+        >>> format_threshold(None)
+        'NULL'
+        >>> format_threshold(float('inf'))
+        "'+Infinity'"
+        >>> format_threshold(float('-inf'))
+        "'-Infinity'"
+        >>> format_threshold(42.5)
+        '42.5'
+
+    """
+    if value is None:
+        return "NULL"
+    if math.isinf(value):
+        if value > 0:
+            return "'+Infinity'"
+        return "'-Infinity'"
+    return str(value)
