@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Changed
+
+- Refactor threshold handling to use math.inf for infinite values and add tests for YAML parsing of infinite thresholds
+
 ## [0.5.0] - 2026-01-06
 
 ### Added

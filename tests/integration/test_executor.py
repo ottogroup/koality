@@ -1,5 +1,6 @@
 """Integration tests for CheckExecutor."""
 
+import math
 from pathlib import Path
 from textwrap import dedent
 from unittest.mock import patch
@@ -450,3 +451,78 @@ def test_data_existence_cache_different_datasets(tmp_path: Path, duckdb_client: 
     # Verify all checks executed successfully
     assert len(result_dict) == 2
     assert not executor.check_failed
+
+
+def test_executor_infinite_thresholds(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test executor with .inf and -.inf as thresholds."""
+    content = dedent(
+        f"""
+        name: koality-infinite-thresholds
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+          log_path: {tmp_path}/message.txt
+
+        check_bundles:
+          - name: check-bundle-1
+            defaults:
+              check_type: CountCheck
+              table: dummy_table
+              check_column: "*"
+            checks:
+              - filters:
+                  shop:
+                    column: shop_code
+                    value: SHOP001
+                    type: identifier
+                lower_threshold: -.inf
+                upper_threshold: .inf
+              - filters:
+                  shop:
+                    column: shop_code
+                    value: SHOP002
+                    type: identifier
+                lower_threshold: 0
+                upper_threshold: .inf
+          - name: check-bundle-2
+            defaults:
+              check_type: NullRatioCheck
+              table: dummy_table
+              check_column: value
+            checks:
+              - filters:
+                  shop:
+                    column: shop_code
+                    value: SHOP001
+                    type: identifier
+                lower_threshold: -.inf
+                upper_threshold: 1.0
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
+    result_dict = executor()
+
+    # All checks should pass with infinite thresholds
+    assert len(result_dict) == 3
+    assert not executor.check_failed
+
+    # Verify thresholds are properly set
+    results_by_metric = {item["METRIC_NAME"]: item for item in result_dict}
+
+    # Check that infinite thresholds are handled correctly
+    assert "row_count" in results_by_metric
+    assert "value_null_ratio" in results_by_metric
+
+    # Verify that infinite thresholds are parsed correctly from YAML
+    for item in result_dict:
+        if item.get("LOWER_THRESHOLD") == -math.inf or item.get("UPPER_THRESHOLD") == math.inf:
+            # At least one threshold is infinite - verify it's truly infinite
+            if item.get("LOWER_THRESHOLD") == -math.inf:
+                assert item["LOWER_THRESHOLD"] < -1e308  # Verify it's negative infinity
+            if item.get("UPPER_THRESHOLD") == math.inf:
+                assert item["UPPER_THRESHOLD"] > 1e308  # Verify it's positive infinity

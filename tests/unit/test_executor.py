@@ -1,5 +1,6 @@
 """Unit tests for CheckExecutor."""
 
+import math
 from pathlib import Path
 from textwrap import dedent
 from unittest.mock import MagicMock, patch
@@ -232,3 +233,60 @@ def test_cache_key_with_no_filters() -> None:
     assert key[1] == "project.dataset"
     assert key[2] is None  # No date filter
     assert key[3] == frozenset()  # Empty filters
+
+
+@pytest.mark.unit
+def test_yaml_parsing_infinite_thresholds(tmp_path: Path) -> None:
+    """Test that YAML parsing correctly handles .inf and -.inf threshold values."""
+    content = dedent(
+        f"""
+        name: test-infinite-thresholds
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+          log_path: {tmp_path}/message.txt
+
+        check_bundles:
+          - name: test-bundle
+            defaults:
+              check_type: CountCheck
+              table: test_table
+              check_column: "*"
+            checks:
+              - shop_id: TEST001
+                lower_threshold: -.inf
+                upper_threshold: .inf
+              - shop_id: TEST002
+                lower_threshold: 0
+                upper_threshold: .inf
+              - shop_id: TEST003
+                lower_threshold: -.inf
+                upper_threshold: 100
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+
+    # Verify that the config was parsed successfully
+    assert config.name == "test-infinite-thresholds"
+    assert len(config.check_bundles) == 1
+    bundle = config.check_bundles[0]
+    assert len(bundle.checks) == 3
+
+    # Verify first check has both infinite thresholds
+    check1 = bundle.checks[0]
+    assert check1.lower_threshold == -math.inf
+    assert check1.upper_threshold == math.inf
+
+    # Verify second check has infinite upper threshold
+    check2 = bundle.checks[1]
+    assert check2.lower_threshold == 0
+    assert check2.upper_threshold == math.inf
+
+    # Verify third check has infinite lower threshold
+    check3 = bundle.checks[2]
+    assert check3.lower_threshold == -math.inf
+    assert check3.upper_threshold == 100

@@ -1,5 +1,6 @@
 """Pydantic models for koality configuration validation."""
 
+import math
 from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal, Self
@@ -167,8 +168,8 @@ class _Defaults(BaseModel):
 class _LocalDefaults(_Defaults):
     check_type: CHECK_TYPE | None = None
     check_column: str | None = None
-    lower_threshold: float | Literal["-infinity", "infinity"] = "-infinity"
-    upper_threshold: float | Literal["-infinity", "infinity"] = "infinity"
+    lower_threshold: float = -math.inf
+    upper_threshold: float = math.inf
     right_table: str | None = None
     left_table: str | None = None
 

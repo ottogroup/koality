@@ -218,7 +218,7 @@ class CheckExecutor:
             for check_bundle in self.config.check_bundles:
                 for check_config in check_bundle.checks:
                     check_factory = CHECK_MAP[check_config.check_type]
-                    check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_unset=True)
+                    check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_none=True)
                     check_kwargs["database_accessor"] = self.config.database_accessor
                     check_kwargs["database_provider"] = self.database_provider
                     check_kwargs["identifier_format"] = self.config.defaults.identifier_format
