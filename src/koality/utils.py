@@ -199,6 +199,6 @@ def format_threshold(value: float | None) -> str:
         return "NULL"
     if math.isinf(value):
         if value > 0:
-            return "'+Infinity'"
-        return "'-Infinity'"
+            return "CAST('+Infinity' AS {numeric_type})"
+        return "CAST('-Infinity' AS {numeric_type})"
     return str(value)

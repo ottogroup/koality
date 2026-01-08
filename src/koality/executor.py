@@ -425,8 +425,8 @@ class CheckExecutor:
                         '{row[identifier_column]}',
                         {f"'{row['COLUMN']}'" if row["COLUMN"] is not None else "NULL"},
                         {row["VALUE"] if row["VALUE"] is not None else "NULL"},
-                        {format_threshold(row["LOWER_THRESHOLD"])},
-                        {format_threshold(row["UPPER_THRESHOLD"])},
+                        {format_threshold(row["LOWER_THRESHOLD"]).format(numeric_type=DATA_TYPES["NUMERIC"][self.database_provider.type])},
+                        {format_threshold(row["UPPER_THRESHOLD"]).format(numeric_type=DATA_TYPES["NUMERIC"][self.database_provider.type])},
                         '{row["RESULT"]}',
                         '{row["INSERT_TIMESTAMP"]}'
                     )

@@ -20,6 +20,7 @@ Types of changes:
 
 - Fix query wrapping
 - Fix date column type casting in SQL queries to handle TIMESTAMP values correctly
+- Fix format_threshold to cast infinity values in query
 
 ## [0.6.0] - 2026-01-07
 

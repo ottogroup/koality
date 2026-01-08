@@ -150,8 +150,8 @@ ATTACH 'project=my-project' AS bq (TYPE bigquery);"""
     ("value", "expected"),
     [
         (None, "NULL"),
-        (float("inf"), "'+Infinity'"),
-        (float("-inf"), "'-Infinity'"),
+        (float("inf"), "CAST('+Infinity' AS {numeric_type})"),
+        (float("-inf"), "CAST('-Infinity' AS {numeric_type})"),
         (0.0, "0.0"),
         (42.5, "42.5"),
         (-10.25, "-10.25"),
