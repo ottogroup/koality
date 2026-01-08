@@ -46,6 +46,7 @@ def identify_database_provider(
 def execute_query(
     query: str,
     duckdb_client: duckdb.DuckDBPyConnection,
+    database_accessor: str,
     database_provider: DatabaseProvider | None,
 ) -> duckdb.DuckDBPyRelation:
     """Execute a query, using bigquery_query() if the accessor is a BigQuery database.
@@ -63,16 +64,13 @@ def execute_query(
             query_upper = query.strip().upper()
             is_write_operation = query_upper.startswith(("INSERT", "CREATE", "UPDATE", "DELETE", "DROP", "ALTER"))
 
-            # path -> google cloud project
-            project = database_provider.path
-
             # Use dollar-quoting to avoid escaping issues with single quotes in the query
             if is_write_operation:
                 # Use bigquery_execute for write operations
-                wrapped_query = f"CALL bigquery_execute('{project}', $bq${query}$bq$)"
+                wrapped_query = f"CALL bigquery_execute('{database_accessor}', $bq${query}$bq$)"
             else:
                 # Use bigquery_query for read operations (supports views)
-                wrapped_query = f"SELECT * FROM bigquery_query('{project}', $bq${query}$bq$)"  # noqa: S608
+                wrapped_query = f"SELECT * FROM bigquery_query('{database_accessor}', $bq${query}$bq$)"  # noqa: S608
 
             return duckdb_client.query(wrapped_query)
         log.info("Database is of type '%s'. Using standard query execution.", database_provider.type)

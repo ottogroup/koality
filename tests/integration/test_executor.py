@@ -17,13 +17,14 @@ from koality.utils import execute_query
 def track_query(
     query: str,
     client: duckdb.DuckDBPyConnection,
+    database_accessor: str,
     provider: DatabaseProvider,
     data_check_query_calls: list[str],
 ) -> duckdb.DuckDBPyRelation:
     """Track queries that check for data existence."""
     if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
         data_check_query_calls.append(query)
-    return execute_query(query, client, provider)
+    return execute_query(query, client, database_accessor, provider)
 
 
 pytestmark = pytest.mark.integration
@@ -376,7 +377,13 @@ def test_data_existence_cache(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConn
 
     with patch(
         "koality.checks.execute_query",
-        side_effect=lambda query, client, provider: track_query(query, client, provider, data_check_query_calls),
+        side_effect=lambda query, client, database_accessor, provider: track_query(
+            query,
+            client,
+            database_accessor,
+            provider,
+            data_check_query_calls,
+        ),
     ):
         result_dict = executor()
 
@@ -440,7 +447,13 @@ def test_data_existence_cache_different_datasets(tmp_path: Path, duckdb_client: 
 
     with patch(
         "koality.checks.execute_query",
-        side_effect=lambda query, client, provider: track_query(query, client, provider, data_check_query_calls),
+        side_effect=lambda query, client, database_accessor, provider: track_query(
+            query,
+            client,
+            database_accessor,
+            provider,
+            data_check_query_calls,
+        ),
     ):
         result_dict = executor()
 

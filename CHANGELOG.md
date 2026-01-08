@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix query wrapping
+
 ## [0.6.0] - 2026-01-07
 
 ### Added
