@@ -406,6 +406,7 @@ class CheckExecutor:
                 execute_query(
                     query_create_or_replace_table,
                     self.duckdb_client,
+                    self.config.database_accessor,
                     self.database_provider,
                 )
             except duckdb.Error as e:
@@ -442,6 +443,7 @@ class CheckExecutor:
                 execute_query(
                     query_insert_values_into_result_table,
                     self.duckdb_client,
+                    self.config.database_accessor,
                     self.database_provider,
                 )
             except duckdb.Error as e:
