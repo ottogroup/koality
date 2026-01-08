@@ -798,7 +798,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
         main_query += (
             "WHERE\n    "
-            f"{date_col} BETWEEN (DATE '{date_val}' - INTERVAL 14 DAY) AND '{date_val}'"
+            f"{date_col} BETWEEN (DATE '{date_val}' - INTERVAL 14 DAY) AND DATE '{date_val}'"
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -1440,16 +1440,16 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         WITH
             base AS (
                 SELECT
-                    {date_col},
+                    CAST({date_col} AS DATE) AS date_col_cast,
                     COUNT(DISTINCT {self.check_column}) AS dist_cnt
                 FROM
                     {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
                 WHERE
-                    {date_col} BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
-                    AND '{date_val}'
+                    CAST({date_col} AS DATE) BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
+                    AND DATE '{date_val}'
                 {where_statement}
                 GROUP BY
-                    {date_col}
+                    CAST({date_col} AS DATE)
             ),
             rolling_avgs AS (
                 SELECT
@@ -1457,7 +1457,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
                 FROM
                     base
                 WHERE
-                    {date_col} BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
+                    date_col_cast BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
                 AND
                     (DATE '{date_val}' - INTERVAL 1 DAY)
             ),
@@ -1468,7 +1468,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
                     MAX(dist_cnt) AS dist_cnt
                 FROM
                     (
-                        SELECT dist_cnt FROM base WHERE {date_col} = '{date_val}'
+                        SELECT dist_cnt FROM base WHERE date_col_cast = DATE '{date_val}'
                         UNION ALL
                         SELECT 0 AS dist_cnt
                     )
@@ -1499,8 +1499,8 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
 
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            return f"{data_exists_query}\n{where_statement} AND {date_col} = '{date_val}'"
-        return f"{data_exists_query}\nWHERE {date_col} = '{date_val}'"
+            return f"{data_exists_query}\n{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
+        return f"{data_exists_query}\nWHERE CAST({date_col} AS DATE) = DATE '{date_val}'"
 
 
 class IqrOutlierCheck(ColumnTransformationCheck):
@@ -1631,10 +1631,10 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                     {where_statement}
             ),
             compare AS (
-                SELECT * FROM base WHERE {date_col} < '{date_val}'
+                SELECT * FROM base WHERE {date_col} < DATE '{date_val}'
             ),
             slice AS (
-                SELECT * FROM base WHERE {date_col} = '{date_val}'
+                SELECT * FROM base WHERE {date_col} = DATE '{date_val}'
             ),
             percentiles AS (
                 SELECT
@@ -1691,7 +1691,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
 
         where_statement = self.assemble_where_statement(self.filters)
         if where_statement:
-            where_statement = f"{where_statement} AND {date_col} = '{date_val}'"
+            where_statement = f"{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
         else:
-            where_statement = f"WHERE {date_col} = '{date_val}'"
+            where_statement = f"WHERE CAST({date_col} AS DATE) = DATE '{date_val}'"
         return f"{data_exists_query}\n{where_statement}"
