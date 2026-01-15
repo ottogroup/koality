@@ -539,3 +539,82 @@ def test_executor_infinite_thresholds(tmp_path: Path, duckdb_client: duckdb.Duck
                 assert item["LOWER_THRESHOLD"] < -1e308  # Verify it's negative infinity
             if item.get("UPPER_THRESHOLD") == math.inf:
                 assert item["UPPER_THRESHOLD"] > 1e308  # Verify it's positive infinity
+
+
+def test_executor_iqr_outlier_check_from_config(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test executor runs IqrOutlierCheck when configured via YAML."""
+    # Create dummy_table_iqr same as integration fixtures
+    duckdb_client.execute("""
+        CREATE TABLE dummy_table_iqr (
+            BQ_PARTITIONTIME DATE,
+            VALUE FLOAT
+        )
+    """)
+
+    duckdb_client.execute("""
+        INSERT INTO dummy_table_iqr VALUES
+        ('2023-01-01', 1),
+        ('2023-01-02', 2),
+        ('2023-01-03', 1),
+        ('2023-01-04', 2),
+        ('2023-01-05', 1),
+        ('2023-01-06', 2),
+        ('2023-01-07', 1),
+        ('2023-01-08', 2),
+        ('2023-01-09', 1),
+        ('2023-01-10', 2),
+        ('2023-01-11', 101),
+        ('2023-01-12', 102),
+        ('2023-01-13', 101),
+        ('2023-01-14', 102),
+        ('2023-01-15', 101)
+    """)
+
+    content = dedent(
+        f"""
+        name: koality-iqr-config
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+          log_path: {tmp_path}/message.txt
+          lower_threshold: -42
+          upper_threshold: 42
+
+        check_bundles:
+          - name: iqr-bundle
+            defaults:
+              check_type: IqrOutlierCheck
+              table: dummy_table_iqr
+              check_column: VALUE
+              interval_days: 14
+              how: both
+              iqr_factor: 1.5
+            checks:
+              - filters:
+                  date:
+                    column: BQ_PARTITIONTIME
+                    value: "2023-01-15"
+                    type: date
+        """,
+    ).strip()
+
+    tmp_file = tmp_path / "koality_config.yaml"
+    tmp_file.write_text(content)
+
+    config = parse_yaml_raw_as(Config, tmp_file.read_text())
+    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
+    result_dict = executor()
+
+    # Metric name should match VALUE_outlier_iqr_both_1_5
+    metric_name = "VALUE_outlier_iqr_both_1_5"
+    result_metrics = {item["METRIC_NAME"]: item for item in result_dict}
+    assert metric_name in result_metrics
+    item = result_metrics[metric_name]
+    assert item["VALUE"] == 101.0
+    assert item["LOWER_THRESHOLD"] == -111.875
+    assert item["UPPER_THRESHOLD"] == 189.125
+    assert item["RESULT"] == "SUCCESS"
+    assert not executor.check_failed
