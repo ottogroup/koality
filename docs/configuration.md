@@ -333,6 +333,8 @@ Detects relative count changes over a rolling window. Requires a filter with `ty
 
 Detects outliers using interquartile range. Requires a filter with `type: date`.
 
+Note: IqrOutlierCheck is a transformation-based check and does not accept `lower_threshold`/`upper_threshold` in its constructor; the executor will ignore those fields when instantiating the check. To run IqrOutlierCheck via configuration, specify its parameters (interval_days, how, iqr_factor) and provide a date filter in the `filters` section.
+
 ```yaml
 - check_type: IqrOutlierCheck
   table: my_table
@@ -345,8 +347,6 @@ Detects outliers using interquartile range. Requires a filter with `type: date`.
   interval_days: 30
   how: "both"             # "both", "upper", or "lower"
   iqr_factor: 1.5
-  lower_threshold: 0.0
-  upper_threshold: 0.05   # Max 5% outliers
 ```
 
 ## Filtering

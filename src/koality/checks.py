@@ -1513,6 +1513,8 @@ class IqrOutlierCheck(ColumnTransformationCheck):
     thresholds are calculated as follows:
         - lower_threshold = q25 - iqr_factor * (q75 - q25)
         - upper_threshold = q75 + iqr_factor * (q75 - q25)
+    Note: `lower_threshold` and `upper_threshold` are calculated internally and should
+    not be provided directly in the configuration for IqrOutlierCheck.
 
     Args:
         filters: Filter configuration dict. Must include a filter with type='date'.

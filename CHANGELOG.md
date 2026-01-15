@@ -16,6 +16,11 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- **IqrOutlierCheck**: Prevent `TypeError` when `IqrOutlierCheck` is initialized with unexpected `lower_threshold` or 
+  `upper_threshold` arguments by filtering them in the executor.
+
 ## [0.7.0] - 2026-01-08
 
 ### Fixed
