@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-01-15
+
 ### Fixed
 
 - **IqrOutlierCheck**: Prevent `TypeError` when `IqrOutlierCheck` is initialized with unexpected `lower_threshold` or 
@@ -139,7 +141,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.7.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.8.0...HEAD
+[0.8.0]: https://github.com/ottogroup/koality/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ottogroup/koality/compare/v0.6.0...v0.7.0
 [0.6.0]: https://github.com/ottogroup/koality/compare/v0.5.0...v0.6.0
 [0.5.0]: https://github.com/ottogroup/koality/compare/v0.4.1...v0.5.0
