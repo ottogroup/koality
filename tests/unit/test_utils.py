@@ -4,7 +4,7 @@ import datetime as dt
 
 import pytest
 
-from koality.utils import format_threshold, parse_date, substitute_variables, to_set
+from koality.utils import format_filter_value, format_threshold, parse_date, substitute_variables, to_set
 
 pytestmark = pytest.mark.unit
 
@@ -161,3 +161,22 @@ ATTACH 'project=my-project' AS bq (TYPE bigquery);"""
 def test_format_threshold(value: float | None, expected: str) -> None:
     """Test format_threshold with various inputs."""
     assert format_threshold(value) == expected
+
+
+@pytest.mark.parametrize(
+    ("value", "operator", "expected"),
+    [
+        (True, "foo", "'True'"),
+        (False, "bar", "'False'"),
+        (1, "IN", "(1)"),
+        (1.0, "NOT IN", "(1.0)"),
+        ((1, 2, 3), "IN", "(1, 2, 3)"),
+        (["a", "b", "c"], "NOT IN", "('a', 'b', 'c')"),
+        (["x", "y"], "IN", "('x', 'y')"),
+        ("single_value", "=", "'single_value'"),
+        (3.14, "<>", "3.14"),
+    ],
+)
+def test_format_filter_value(value: str | float | None, operator: str, expected: str) -> None:
+    """Test format_filter_value with various inputs."""
+    assert format_filter_value(value, operator) == expected

@@ -46,7 +46,7 @@ def identify_database_provider(
 def execute_query(
     query: str,
     duckdb_client: duckdb.DuckDBPyConnection,
-    database_accessor: str,
+    database_accessor: str | None,
     database_provider: DatabaseProvider | None,
 ) -> duckdb.DuckDBPyRelation:
     """Execute a query, using bigquery_query() if the accessor is a BigQuery database.
@@ -74,7 +74,6 @@ def execute_query(
 
             return duckdb_client.query(wrapped_query)
         log.info("Database is of type '%s'. Using standard query execution.", database_provider.type)
-
     return duckdb_client.query(query)
 
 
@@ -202,3 +201,29 @@ def format_threshold(value: float | None) -> str:
             return "CAST('+Infinity' AS {numeric_type})"
         return "CAST('-Infinity' AS {numeric_type})"
     return str(value)
+
+
+def format_filter_value(
+    value: str | float | list | tuple | set,
+    operator: str,
+) -> str:
+    """Format a filter value for SQL based on the operator.
+
+    Args:
+        value: The filter value (can be a single value or list for IN/NOT IN).
+        operator: The SQL operator being used.
+
+    Returns:
+        Formatted SQL value string.
+
+    """
+    if operator in ("IN", "NOT IN"):
+        if isinstance(value, (list, tuple, set)):
+            formatted_values = ", ".join(str(v) if isinstance(v, (int, float)) else f"'{v}'" for v in value)
+            return f"({formatted_values})"
+        return f"('{value}')" if not isinstance(value, (int, float)) else f"({value})"
+
+    if isinstance(value, (int, float)) and not isinstance(value, bool):
+        return str(value)
+
+    return f"'{value}'"
