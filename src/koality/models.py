@@ -213,7 +213,7 @@ class _ValuesInSetCheck(_SingleTableCheck):
     """Config model for ValuesInSetCheck."""
 
     check_type: Literal["ValuesInSetCheck"]
-    value_set: list[str] | str
+    value_set: set[str | bool | int]
 
 
 class _RollingValuesInSetCheck(_ValuesInSetCheck):
