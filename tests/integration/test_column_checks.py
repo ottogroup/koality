@@ -646,6 +646,7 @@ def test_iqr_outlier_check_two_shops_success(duckdb_client_iqr_two_shops: duckdb
         },
     )
     result = check(duckdb_client_iqr_two_shops)
+    assert result["METRIC_NAME"] == "VALUE_outlier_iqr_both_1_5"
     assert result["VALUE"] == 101.0
     assert result["RESULT"] == "SUCCESS"
     assert result["IDENTIFIER"] == "SHOP_ID=abcd"

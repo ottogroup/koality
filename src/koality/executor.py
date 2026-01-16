@@ -202,7 +202,7 @@ class CheckExecutor:
 
         return table, database_accessor, date_value, filters_key
 
-    def get_data_requirements(self) -> defaultdict[str, defaultdict[str, set]]:
+    def get_data_requirements(self) -> defaultdict[str, defaultdict[str, set]]:  # noqa: C901
         """Aggregate data requirements from all checks.
 
         This method collects all required tables, columns, and filter configurations
@@ -216,10 +216,11 @@ class CheckExecutor:
         data_requirements = defaultdict(lambda: defaultdict(set))
         for check in self.checks:
             table_name = check.table
+            check_filters = check.filters
             # Add check-specific columns and filter columns to the requirements
             if check.check_column and check.check_column != "*":
                 data_requirements[table_name]["columns"].add(check.check_column)
-            for _filter in check.filters.values():
+            for _filter in check_filters.values():
                 if "column" in _filter:
                     data_requirements[table_name]["columns"].add(_filter["column"])
 
@@ -234,8 +235,11 @@ class CheckExecutor:
                     if "column" in _filter:
                         data_requirements[check.right_table]["columns"].add(_filter["column"])
 
+            if isinstance(check, IqrOutlierCheck):
+                check_filters = {k: v for k, v in check.filters.items() if v.get("type") != "date"}
+
             # Store unique filter configurations for each table
-            filter_key = frozenset((name, frozenset(config.items())) for name, config in check.filters.items())
+            filter_key = frozenset((name, frozenset(config.items())) for name, config in check_filters.items())
             data_requirements[table_name]["filters"].add(filter_key)
         return data_requirements
 

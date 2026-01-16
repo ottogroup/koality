@@ -20,6 +20,7 @@ Types of changes:
 
 - Refactor executor to bulk load data into DuckDB memory and run checks from there
 - Update ValuesInSetCheck config to require value_set as a set of str, bool, or int
+- Refactor IqrOutlierCheck to consistently exclude date filters from WHERE clauses and data requirements
 
 ### Fixed
 
