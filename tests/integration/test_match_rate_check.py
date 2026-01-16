@@ -209,3 +209,75 @@ def test_match_rate_check_no_data(duckdb_client: duckdb.DuckDBPyConnection, day:
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == day
     assert result["IDENTIFIER"] == f"shop_code={shop}"
+
+
+@pytest.fixture
+def duckdb_client_one_table_empty() -> duckdb.DuckDBPyConnection:
+    """Create an in-memory DuckDB connection with one empty table."""
+    conn = duckdb.connect(":memory:")
+
+    # Create purchase_order table
+    conn.execute("""
+        CREATE TABLE purchase_order (
+            DATE DATE,
+            shop_code VARCHAR,
+            product_number VARCHAR
+        )
+    """)
+
+    # Create skufeed table
+    conn.execute("""
+        CREATE TABLE skufeed (
+            DATE DATE,
+            shop_code VARCHAR,
+            product_number VARCHAR
+        )
+    """)
+
+    return conn
+
+
+@pytest.mark.parametrize(
+    ("left_empty"),
+    [
+        (True),
+        (False),
+    ],
+)
+def test_match_rate_check_one_table_empty(
+    duckdb_client_one_table_empty: duckdb.DuckDBPyConnection,
+    *,
+    left_empty: bool,
+) -> None:
+    """Test check if one of the tables is empty."""
+    conn = duckdb_client_one_table_empty
+    if left_empty:
+        # Insert skufeed data
+        conn.execute("""
+            INSERT INTO skufeed VALUES
+            ('2023-01-01', 'SHOP001', 'SHOP001-0001')
+        """)
+    else:
+        # Insert purchase data
+        conn.execute("""
+            INSERT INTO purchase_order VALUES
+            ('2023-01-01', 'SHOP001', 'SHOP001-0001')
+        """)
+
+    check = MatchRateCheck(
+        database_accessor="",
+        database_provider=None,
+        left_table="purchase_order",
+        right_table="skufeed",
+        join_columns=["product_number"],
+        check_column="product_number",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+    )
+    result = check(conn)
+    # No data for this shop/day -> data_exists check
+    assert result["METRIC_NAME"] == "data_exists"
+    assert result["DATE"] == "2023-01-01"
+    assert result["IDENTIFIER"] == "shop_code=SHOP001"
