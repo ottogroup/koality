@@ -412,6 +412,8 @@ class DataQualityCheck(abc.ABC):
         for filter_dict in filters.values():
             column = filter_dict["column"]
             value = filter_dict["value"]
+            if filter_dict.get("type") == "identifier" and value == "*":
+                continue
             operator = filter_dict.get("operator", "=")
 
             # Handle NULL values with IS NULL / IS NOT NULL
@@ -424,6 +426,9 @@ class DataQualityCheck(abc.ABC):
 
             formatted_value = DataQualityCheck._format_filter_value(value, operator)
             filters_statements.append(f"    {column} {operator} {formatted_value}")
+
+        if len(filters_statements) == 0:
+            return ""
 
         return "WHERE\n" + "\nAND\n".join(filters_statements)
 
@@ -637,7 +642,7 @@ class RegexMatchCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for calculating regex match ratio."""
-        return f"""AVG(IF(REGEXP_MATCHES({self.check_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
+        return f"""AVG(IF(regexp_matches({self.check_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
 
 
 class ValuesInSetCheck(ColumnTransformationCheck):
@@ -691,7 +696,7 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         if not self.value_set:
             msg = "'value_set' must not be empty"
             raise KoalityError(msg)
-        self.value_set_string = f"({str(self.value_set)[1:-1]})"
+        self.value_set_string = DataQualityCheck._format_filter_value(self.value_set, "IN")
 
         super().__init__(
             database_accessor=database_accessor,
@@ -799,7 +804,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
 
         main_query += (
             "WHERE\n    "
-            f"{date_col} BETWEEN (DATE '{date_val}' - INTERVAL 14 DAY) AND DATE '{date_val}'"
+            f"CAST({date_col} AS DATE) BETWEEN (DATE '{date_val}' - INTERVAL 14 DAY) AND DATE '{date_val}'"
         )  # TODO: maybe parameterize interval days
 
         if where_statement := self.assemble_where_statement(self.filters):

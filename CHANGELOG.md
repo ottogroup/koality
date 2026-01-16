@@ -19,6 +19,7 @@ Types of changes:
 ### Fixed
 
 - Fix data_exists query in MatchRate check and improve error handling for empty tables
+- Improve filter handling in SQL assembly and enforce identifier filter presence in check validation
 
 ## [0.8.0] - 2026-01-15
 
