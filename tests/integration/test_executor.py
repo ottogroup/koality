@@ -13,6 +13,8 @@ from koality.executor import CheckExecutor
 from koality.models import Config, DatabaseProvider
 from koality.utils import execute_query
 
+pytestmark = pytest.mark.integration
+
 
 def track_query(
     query: str,
@@ -25,9 +27,6 @@ def track_query(
     if "IF(COUNT(*) > 0" in query or "IF(COUNTIF" in query:
         data_check_query_calls.append(query)
     return execute_query(query, client, database_accessor, provider)
-
-
-pytestmark = pytest.mark.integration
 
 
 @pytest.fixture
@@ -294,36 +293,11 @@ def test_executor_regex_match_check(tmp_path: Path, duckdb_client: duckdb.DuckDB
     config = parse_yaml_raw_as(Config, tmp_file.read_text())
     executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
     result_dict = executor()
-
     # All product numbers match pattern SHOPXXX-XXXX
-    result = {item["METRIC_NAME"] for item in result_dict}
-    assert "product_number_regex_match_ratio" in result
+    assert len(result_dict) == 2
+    assert all(item["METRIC_NAME"] == "product_number_regex_match_ratio" for item in result_dict)
+    assert all(item["VALUE"] == 1.0 for item in result_dict)
     assert not executor.check_failed
-
-
-def test_executor_progress_bar(config_file_success: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:
-    """Test that progress bar is displayed during check execution."""
-    config = parse_yaml_raw_as(Config, config_file_success.read_text())
-    executor = CheckExecutor(config=config, duckdb_client=duckdb_client)
-
-    with patch("koality.executor.tqdm") as mock_tqdm:
-        # Setup mock to return a context manager
-        mock_pbar = mock_tqdm.return_value.__enter__.return_value
-
-        executor()
-
-        # Verify tqdm was called with correct parameters
-        mock_tqdm.assert_called_once()
-        call_kwargs = mock_tqdm.call_args.kwargs
-        assert call_kwargs["total"] == 4  # config_file_success has 4 checks (2 bundles x 2 checks each)
-        assert call_kwargs["desc"] == "Executing checks"
-        assert call_kwargs["unit"] == "check"
-
-        # Verify progress bar was updated 4 times (once per check)
-        assert mock_pbar.update.call_count == 4
-        # Each update should increment by 1
-        for call in mock_pbar.update.call_args_list:
-            assert call[0][0] == 1
 
 
 def test_data_existence_cache(tmp_path: Path, duckdb_client: duckdb.DuckDBPyConnection) -> None:

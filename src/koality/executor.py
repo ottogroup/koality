@@ -175,7 +175,7 @@ class CheckExecutor:
 
         # Special handling for MatchRateCheck which has table-specific filters
         # These are used in the data existence query and must be part of the cache key
-        if hasattr(check_instance, "filters_left") and hasattr(check_instance, "filters_right"):
+        if isinstance(check_instance, MatchRateCheck):
             # Add left table filters
             for filter_name, filter_config in sorted(check_instance.filters_left.items()):
                 filter_tuple = (
@@ -200,7 +200,97 @@ class CheckExecutor:
 
         filters_key = frozenset(filters_items)
 
-        return (table, database_accessor, date_value, filters_key)
+        return table, database_accessor, date_value, filters_key
+
+    def get_data_requirements(self) -> defaultdict[str, defaultdict[str, set]]:
+        """Aggregate data requirements from all checks.
+
+        This method collects all required tables, columns, and filter configurations
+        from the checks. The requirements are loaded into the in-memory DuckDB database
+        from which the checks will read their data.
+
+        Returns:
+            A nested dictionary mapping table names to required columns and filter configurations.
+
+        """
+        data_requirements = defaultdict(lambda: defaultdict(set))
+        for check in self.checks:
+            table_name = check.table
+            # Add check-specific columns and filter columns to the requirements
+            if check.check_column and check.check_column != "*":
+                data_requirements[table_name]["columns"].add(check.check_column)
+            for _filter in check.filters.values():
+                if "column" in _filter:
+                    data_requirements[table_name]["columns"].add(_filter["column"])
+
+            # For MatchRateCheck, add columns from both left and right tables
+            if isinstance(check, MatchRateCheck):
+                data_requirements[check.left_table]["columns"].update(check.join_columns_left)
+                data_requirements[check.right_table]["columns"].update(check.join_columns_right)
+                for _filter in check.filters_left.values():
+                    if "column" in _filter:
+                        data_requirements[check.left_table]["columns"].add(_filter["column"])
+                for _filter in check.filters_right.values():
+                    if "column" in _filter:
+                        data_requirements[check.right_table]["columns"].add(_filter["column"])
+
+            # Store unique filter configurations for each table
+            filter_key = frozenset((name, frozenset(config.items())) for name, config in check.filters.items())
+            data_requirements[table_name]["filters"].add(filter_key)
+        return data_requirements
+
+    def fetch_data_into_memory(self, data_requirements: defaultdict[str, defaultdict[str, set]]) -> None:
+        """Fetch all required data into DuckDB memory before executing checks.
+
+        This method aggregates all data requirements (tables, columns, filters) from the checks,
+        constructs efficient bulk-SELECT queries, and executes them to populate in-memory DuckDB tables.
+        This avoids executing a separate query for each check.
+        """
+        for table, requirements in data_requirements.items():
+            columns = ", ".join(sorted(set(requirements["columns"])))
+            if not columns:
+                columns = "*"
+
+            # Combine all unique filter groups with OR
+            all_filters_sql = set()
+            for filter_group in requirements["filters"]:
+                filter_dict = {name: dict(config) for name, config in filter_group}
+                where_clause = DataQualityCheck.assemble_where_statement(filter_dict)
+                # Extract the conditions from the WHERE clause
+                if where_clause.strip().startswith("WHERE"):
+                    conditions = where_clause.strip()[len("WHERE") :].strip()
+                    if conditions:
+                        all_filters_sql.add(f"({conditions})")
+
+            # Build the final WHERE clause
+            final_where_clause = ""
+            if all_filters_sql:
+                final_where_clause = "WHERE " + " OR ".join(all_filters_sql)
+
+            # Construct the bulk SELECT query
+            select_query = f"""
+            SELECT {columns}
+            FROM {table}
+            {final_where_clause}
+            """  # noqa: S608
+
+            try:
+                # Execute the query to get the data as a DuckDB relation
+                relation = execute_query(  # noqa: F841
+                    select_query,
+                    self.duckdb_client,
+                    self.config.database_accessor,
+                    self.database_provider,
+                )
+                # Create a table in DuckDB from the relation
+                self.duckdb_client.sql(f'CREATE OR REPLACE TABLE "{table}" AS SELECT * FROM relation')  # noqa: S608
+                msg = f"Successfully loaded data for table {table} into memory."
+                log.info(msg)
+            except duckdb.Error as e:
+                msg = f"Failed to load data for table {table}"
+                log.exception(msg)
+                # Decide if we should raise the error or continue
+                raise DatabaseError(msg) from e
 
     def execute_checks(self) -> None:
         """Instantiate and execute all checks.
@@ -211,42 +301,43 @@ class CheckExecutor:
         """
         results = []
 
-        # Calculate total number of checks
-        total_checks = sum(len(check_bundle.checks) for check_bundle in self.config.check_bundles)
+        # First, instantiate all the checks
+        for check_bundle in self.config.check_bundles:
+            for check_config in check_bundle.checks:
+                check_factory = CHECK_MAP[check_config.check_type]
+                check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_none=True)
 
-        with tqdm(total=total_checks, desc="Executing checks", unit="check") as pbar:
-            for check_bundle in self.config.check_bundles:
-                for check_config in check_bundle.checks:
-                    check_factory = CHECK_MAP[check_config.check_type]
-                    check_kwargs = check_config.model_dump(exclude={"check_type"}, exclude_none=True)
+                if check_config.check_type == "IqrOutlierCheck":
+                    check_kwargs.pop("lower_threshold", None)
+                    check_kwargs.pop("upper_threshold", None)
 
-                    # IqrOutlierCheck does not accept threshold arguments, so we remove them if they exist
-                    if check_config.check_type == "IqrOutlierCheck":
-                        check_kwargs.pop("lower_threshold", None)
-                        check_kwargs.pop("upper_threshold", None)
+                check_kwargs["database_accessor"] = self.config.database_accessor
+                check_kwargs["database_provider"] = self.database_provider
+                check_kwargs["identifier_format"] = self.config.defaults.identifier_format
+                check_instance = check_factory(**check_kwargs)
+                self.checks.append(check_instance)
 
-                    check_kwargs["database_accessor"] = self.config.database_accessor
-                    check_kwargs["database_provider"] = self.database_provider
-                    check_kwargs["identifier_format"] = self.config.defaults.identifier_format
-                    check_instance = check_factory(**check_kwargs)
-                    self.checks.append(check_instance)
+        # Now, fetch all data into memory if using a database accessor
+        # this is required so that we can run all checks against the in-memory data and rely solely on
+        # DuckDB functionality like regexp_matches and others
+        if self.config.database_accessor:
+            data_requirements = self.get_data_requirements()
+            self.fetch_data_into_memory(data_requirements)
 
-                    # Check cache before running data_check
-                    cache_key = self._get_dataset_cache_key(check_instance)
-                    if cache_key not in self._data_existence_cache:
-                        data_check_result = check_instance.data_check(self.duckdb_client)
-                        self._data_existence_cache[cache_key] = data_check_result
-                    else:
-                        data_check_result = self._data_existence_cache[cache_key]
+        # Then, execute the checks against the in-memory data
+        for check_instance in tqdm(self.checks, desc="Executing checks", unit="check"):
+            # From now on, we query the in-memory DB, so we don't need the accessor
+            cache_key = self._get_dataset_cache_key(check_instance)
+            if cache_key not in self._data_existence_cache:
+                data_check_result = check_instance.data_check(self.duckdb_client)
+                self._data_existence_cache[cache_key] = data_check_result
+            else:
+                data_check_result = self._data_existence_cache[cache_key]
 
-                    # If data_check returned a result (data missing), use it
-                    if data_check_result:
-                        results.append(data_check_result)
-                    else:
-                        # Otherwise run the actual check
-                        results.append(check_instance.check(self.duckdb_client))
-
-                    pbar.update(1)
+            if data_check_result:
+                results.append(data_check_result)
+            else:
+                results.append(check_instance.check(self.duckdb_client))
 
         for check in self.checks:
             if check.status in ("FAIL", "ERROR"):

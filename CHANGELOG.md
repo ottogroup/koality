@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Changed
+
+- Refactor executor to bulk load data into DuckDB memory and run checks from there
+
 ### Fixed
 
 - Fix data_exists query in MatchRate check and improve error handling for empty tables

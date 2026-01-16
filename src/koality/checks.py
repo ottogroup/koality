@@ -10,7 +10,7 @@ import duckdb
 
 from koality.exceptions import DatabaseError, KoalityError
 from koality.models import DatabaseProvider, FilterConfig
-from koality.utils import execute_query, parse_date, to_set
+from koality.utils import execute_query, format_filter_value, parse_date, to_set
 
 FLOAT_PRECISION = 4
 
@@ -143,13 +143,12 @@ class DataQualityCheck(abc.ABC):
             data exists.
 
         """
-        is_empty_table = False
         try:
             result = execute_query(
                 self.assemble_data_exists_query(),
                 duckdb_client,
-                self.database_accessor,
-                self.database_provider,
+                None,
+                None,
             ).fetchone()
         except duckdb.Error as e:
             msg = f"Error while executing data check query on {self.table}"
@@ -178,8 +177,8 @@ class DataQualityCheck(abc.ABC):
             result = execute_query(
                 query,
                 duckdb_client,
-                self.database_accessor,
-                self.database_provider,
+                None,
+                None,
             )
         except duckdb.Error as e:
             error = str(e)
@@ -344,32 +343,6 @@ class DataQualityCheck(abc.ABC):
         return None
 
     @staticmethod
-    def _format_filter_value(
-        value: str | float | list | tuple | set,
-        operator: str,
-    ) -> str:
-        """Format a filter value for SQL based on the operator.
-
-        Args:
-            value: The filter value (can be a single value or list for IN/NOT IN).
-            operator: The SQL operator being used.
-
-        Returns:
-            Formatted SQL value string.
-
-        """
-        if operator in ("IN", "NOT IN"):
-            if isinstance(value, (list, tuple, set)):
-                formatted_values = ", ".join(f"'{v}'" for v in value)
-                return f"({formatted_values})"
-            return f"('{value}')"
-
-        if isinstance(value, (int, float)) and not isinstance(value, bool):
-            return str(value)
-
-        return f"'{value}'"
-
-    @staticmethod
     def assemble_where_statement(filters: dict[str, dict[str, Any]]) -> str:
         """Generate the where statement for the check query using the specified filters.
 
@@ -424,7 +397,7 @@ class DataQualityCheck(abc.ABC):
                     filters_statements.append(f"    {column} IS NULL")
                 continue
 
-            formatted_value = DataQualityCheck._format_filter_value(value, operator)
+            formatted_value = format_filter_value(value, operator)
             filters_statements.append(f"    {column} {operator} {formatted_value}")
 
         if len(filters_statements) == 0:
@@ -494,7 +467,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         SELECT
             {metric_statement}
         FROM
-            {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
+            "{self.table}"
         """
 
     def assemble_query(self) -> str:
@@ -512,7 +485,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         SELECT
             IF(COUNT(*) > 0, '', '{self.table}') AS empty_table
         FROM
-            {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
+            "{self.table}"
         """
 
         if where_statement := self.assemble_where_statement(self.filters):
@@ -696,7 +669,7 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         if not self.value_set:
             msg = "'value_set' must not be empty"
             raise KoalityError(msg)
-        self.value_set_string = DataQualityCheck._format_filter_value(self.value_set, "IN")
+        self.value_set_string = format_filter_value(self.value_set, "IN")
 
         super().__init__(
             database_accessor=database_accessor,
@@ -1291,14 +1264,14 @@ class MatchRateCheck(DataQualityCheck):
                     {right_column_statement},
                     TRUE AS in_right_table
                 FROM
-                    {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.right_table}
+                    "{self.right_table}"
                 {self.assemble_where_statement(self.filters_right)}
             ),
             lefty AS (
                 SELECT
                     *
                 FROM
-                    {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.left_table}
+                    "{self.left_table}"
                 {self.assemble_where_statement(self.filters_left)}
             )
 
@@ -1313,7 +1286,7 @@ class MatchRateCheck(DataQualityCheck):
                 righty
             ON
                 {join_on_statement}
-        """  # noqa: E501
+        """
 
     def assemble_data_exists_query(self) -> str:
         """First checks left, then right table for data.
@@ -1328,7 +1301,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS right_counter,
             FROM
-                {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.right_table}
+                "{self.right_table}"
             {self.assemble_where_statement(self.filters_right)}
         ),
 
@@ -1336,7 +1309,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS left_counter,
             FROM
-                {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.left_table}
+                "{self.left_table}"
             {self.assemble_where_statement(self.filters_left)}
         )
 
@@ -1346,7 +1319,7 @@ class MatchRateCheck(DataQualityCheck):
                 IF((SELECT * FROM righty) > 0, '', '{self.right_table}'),
                 '{self.left_table}'
             ) AS empty_table
-        """  # noqa: E501
+        """
 
 
 class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts parameter?
@@ -1449,7 +1422,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
                     CAST({date_col} AS DATE) AS date_col_cast,
                     COUNT(DISTINCT {self.check_column}) AS dist_cnt
                 FROM
-                    {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
+                    "{self.table}"
                 WHERE
                     CAST({date_col} AS DATE) BETWEEN (DATE '{date_val}' - INTERVAL {self.rolling_days} DAY)
                     AND DATE '{date_val}'
@@ -1490,7 +1463,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             JOIN
                 rolling_avgs
             ON TRUE
-        """  # noqa: E501
+        """
 
     def assemble_data_exists_query(self) -> str:
         """Assemble the SQL query to check if data exists for the check date."""
@@ -1498,7 +1471,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         SELECT
             IF(COUNT(*) > 0, '', '{self.table}') AS empty_table
         FROM
-            {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
+            "{self.table}"
         """
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
@@ -1632,7 +1605,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                     {self.check_column}
                     {filter_columns}
                 FROM
-                    {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
+                    "{self.table}"
                 WHERE
                     DATE({date_col}) BETWEEN (DATE '{date_val}' - INTERVAL {self.interval_days} DAY)
                     AND DATE '{date_val}'
@@ -1662,7 +1635,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
                 LEFT JOIN percentiles
                 ON TRUE
             )
-        """  # noqa: E501
+        """
 
     def query_boilerplate(self, metric_statement: str) -> str:
         """Return the query structure for IQR outlier detection."""
@@ -1692,7 +1665,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         SELECT
             IF(COUNTIF({self.check_column} IS NOT NULL) > 0, '', '{self.table}') AS empty_table
         FROM
-            {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.table}
+            "{self.table}"
         """
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
