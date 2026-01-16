@@ -474,7 +474,11 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         """Assemble the complete SQL query for this check."""
         main_query = self.query_boilerplate(self.transformation_statement())
 
-        if where_statement := self.assemble_where_statement(self.filters):
+        filters = self.filters.copy()
+        if isinstance(self, IqrOutlierCheck):
+            filters = {name: cfg for name, cfg in filters.items() if cfg.get("type") != "date"}
+
+        if where_statement := self.assemble_where_statement(filters):
             return main_query + "\n" + where_statement
 
         return main_query
@@ -1579,9 +1583,6 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             monitor_only=monitor_only,
         )
 
-        # Remove date filter from WHERE clause (it's used in the interval SQL, not WHERE)
-        self.filters = {name: cfg for name, cfg in self.filters.items() if cfg.get("type") != "date"}
-
     def transformation_statement(self) -> str:
         """Return the SQL statement for IQR-based outlier detection."""
         # TODO: currently we only raise an error if there is no data for the date
@@ -1592,10 +1593,12 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
-        if self.filters:
-            filter_columns = ",\n".join([v["column"] for v in self.filters.values()])
+        filters = {k: v for k, v in self.filters.items() if v["type"] != "date"}
+
+        if filters:
+            filter_columns = ",\n".join([v["column"] for v in filters.values()])
             filter_columns = ",\n" + filter_columns
-            where_statement = self.assemble_where_statement(self.filters)
+            where_statement = self.assemble_where_statement(filters)
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
         return f"""
         WITH
@@ -1670,7 +1673,9 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
-        where_statement = self.assemble_where_statement(self.filters)
+        filters = {k: v for k, v in self.filters.items() if v["type"] != "date"}
+
+        where_statement = self.assemble_where_statement(filters)
         if where_statement:
             where_statement = f"{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
         else:
