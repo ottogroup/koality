@@ -86,6 +86,7 @@ docs = [
 ]
 
 [tool.ruff]
+include = ["pyproject.toml", "src/**/*.py", "tests/**/*.py"]
 line-length = 120
 
 [tool.ruff.lint]
