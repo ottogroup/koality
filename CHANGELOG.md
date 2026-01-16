@@ -19,6 +19,7 @@ Types of changes:
 ### Changed
 
 - Refactor executor to bulk load data into DuckDB memory and run checks from there
+- Update ValuesInSetCheck config to require value_set as a set of str, bool, or int
 
 ### Fixed
 
