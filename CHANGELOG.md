@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Fix data_exists query in MatchRate check and improve error handling for empty tables
+
 ## [0.8.0] - 2026-01-15
 
 ### Fixed

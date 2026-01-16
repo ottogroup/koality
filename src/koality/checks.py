@@ -8,7 +8,7 @@ from typing import Any, Literal
 
 import duckdb
 
-from koality.exceptions import KoalityError
+from koality.exceptions import DatabaseError, KoalityError
 from koality.models import DatabaseProvider, FilterConfig
 from koality.utils import execute_query, parse_date, to_set
 
@@ -151,8 +151,9 @@ class DataQualityCheck(abc.ABC):
                 self.database_accessor,
                 self.database_provider,
             ).fetchone()
-        except duckdb.Error:
-            empty_table = f"Error while executing data check query on {self.table}"
+        except duckdb.Error as e:
+            msg = f"Error while executing data check query on {self.table}"
+            raise DatabaseError(msg) from e
         else:
             empty_table = result[0] if result else self.table
             is_empty_table = bool(empty_table)
@@ -1330,7 +1331,7 @@ class MatchRateCheck(DataQualityCheck):
             SELECT
                 COUNT(*) AS left_counter,
             FROM
-                {f"{self.database_accessor}." if self.database_accessor else ""}{self.left_table}
+                {f"{self.database_accessor}." if self.database_accessor and not self.query_wrapped else ""}{self.left_table}
             {self.assemble_where_statement(self.filters_left)}
         )
 
