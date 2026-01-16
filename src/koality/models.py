@@ -400,6 +400,8 @@ class Config(BaseModel):
         When identifier_format is 'filter_name' or 'column_name', all identifier
         filters across all checks must have the same filter name or column name
         respectively, since these are used as result column headers.
+        Also checks that if identifier_format is 'filter_name' or 'column_name',
+        every check has an identifier filter.
         """
         identifier_format = self.defaults.identifier_format
         if identifier_format == "identifier":
@@ -410,10 +412,21 @@ class Config(BaseModel):
 
         for bundle in self.check_bundles:
             for check in bundle.checks:
+                has_identifier_filter = False
                 for name, config in check.filters.items():
                     if config.type == "identifier":
+                        has_identifier_filter = True
                         filter_names.add(name)
-                        column_names.add(config.column)
+                        if config.column:
+                            column_names.add(config.column)
+
+                if not has_identifier_filter:
+                    msg = (
+                        f"Check '{check.check_type}' in bundle '{bundle.name}' is missing an identifier filter. "
+                        f"When identifier_format is '{identifier_format}', every check must have a filter with "
+                        f"type='identifier'."
+                    )
+                    raise ValueError(msg)
 
         if identifier_format == "filter_name" and len(filter_names) > 1:
             msg = (
