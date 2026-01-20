@@ -407,10 +407,12 @@ class CheckExecutor:
 
         """
         # Other results to be left untouched
-        result_other = [result for result in result_dicts if result["METRIC_NAME"] != "data_exists"]
+        result_other = [
+            result for result in result_dicts if result["METRIC_NAME"] not in ("data_exists", "table_exists")
+        ]
 
-        # Missing data results to be aggregated
-        result_no_data = [result for result in result_dicts if result["METRIC_NAME"] == "data_exists"]
+        # Missing data results to be aggregated (includes table_exists)
+        result_no_data = [result for result in result_dicts if result["METRIC_NAME"] in ("data_exists", "table_exists")]
 
         # Group and aggregate messages
         if not result_no_data:

@@ -55,6 +55,10 @@ For comprehensive documentation, visit the [Koality Documentation](https://ottog
 Koality uses DuckDB as its query engine. External databases are accessed through DuckDB extensions (e.g., the BigQuery extension for Google Cloud).
 External databases may need custom handling in [`execute_query`](src/koality/utils.py)!
 
+Note on missing tables/datasets
+
+Koality maps provider-specific "not found" errors (e.g., BigQuery Binder "Not found: Dataset ..." or DuckDB "does not exist") to a unified `table_exists` metric. When a check's query fails because the target table or dataset is missing, Koality records a `table_exists` failure for the affected table instead of a generic error to make missing-data diagnostics consistent across providers.
+
 ## Available Checks
 
 | Check Type                | Description                                  |

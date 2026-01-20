@@ -204,7 +204,29 @@ class DataQualityCheck(abc.ABC):
 
         check_value = result[0][self.name] if result else None
         check_value = float(check_value) if check_value is not None else None
+
+        date = self.date_filter["value"] if self.date_filter else dt.datetime.now(tz=dt.UTC).date().isoformat()
+
         if error:
+            # Map BigQuery binder "dataset not found" errors to a table existence failure
+            err_str = str(error)
+            # Any "not found" / "does not exist" error (BigQuery Binder or DuckDB) maps to table_exists
+            lowered = err_str.lower()
+            if "not found" in lowered or "does not exist" in lowered:
+                self.status = "FAIL"
+                result_dict = {
+                    "DATE": date,
+                    "METRIC_NAME": "table_exists",
+                    self.identifier_column: self.identifier,
+                    "TABLE": self.table,
+                    "COLUMN": None,
+                    "VALUE": None,
+                    "LOWER_THRESHOLD": None,
+                    "UPPER_THRESHOLD": None,
+                    "RESULT": "FAIL",
+                }
+                self.result = result_dict
+                return result_dict
             result = "ERROR"
             self.message = f"{self.identifier}: Metric {self.name} query errored with {error}"
         elif self.monitor_only:
@@ -213,7 +235,6 @@ class DataQualityCheck(abc.ABC):
             success = check_value is not None and self.lower_threshold <= check_value <= self.upper_threshold
             result = "SUCCESS" if success else "FAIL"
 
-        date = self.date_filter["value"] if self.date_filter else dt.datetime.now(tz=dt.UTC).date().isoformat()
         result_dict = {
             "DATE": date,
             "METRIC_NAME": self.name,
