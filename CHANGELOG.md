@@ -19,6 +19,7 @@ Types of changes:
 ### Added
 
 - Allow setting `monitor_only` on check bundles and on individual checks
+- Map provider/table-not-found errors to a unified `table_exists` metric
 
 ## [0.9.0] - 2026-01-16
 

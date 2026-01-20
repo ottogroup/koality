@@ -198,3 +198,25 @@ def test_identifier_format_identifier_default(duckdb_client: duckdb.DuckDBPyConn
     assert result["IDENTIFIER"] == "shop_code=SHOP001"
     assert check.identifier == "shop_code=SHOP001"
     assert check.identifier_column == "IDENTIFIER"
+
+
+def test_missing_table_maps_to_table_exists() -> None:
+    """Querying a non-existent table should produce a table_exists failure."""
+    conn = duckdb.connect(":memory:")
+
+    check = CountCheck(
+        database_accessor="",
+        database_provider=None,
+        table="missing_table",
+        check_column="*",
+        filters={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+    )
+
+    result = check.check(conn)
+
+    assert result["METRIC_NAME"] == "table_exists"
+    assert result["RESULT"] == "FAIL"
+    assert result["TABLE"] == "missing_table"
