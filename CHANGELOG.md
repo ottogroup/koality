@@ -27,6 +27,7 @@ Types of changes:
 ### Fixed
 
 - Quote table identifiers in bulk SELECTs when loading data into DuckDB memory to avoid BigQuery binder errors for identifiers that look like project IDs (e.g., `EC0601`). Added an integration test covering the quoting behavior.
+- Ensure MatchRateCheck only requires the check column from the left table; the right table now only contributes join and filter columns to avoid unnecessary column selection and errors.
 
 ## [0.9.0] - 2026-01-16
 

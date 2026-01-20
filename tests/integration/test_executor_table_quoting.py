@@ -58,4 +58,5 @@ def test_fetch_data_into_memory_quotes_table(monkeypatch: pytest.MonkeyPatch) ->
     executor.fetch_data_into_memory(data_requirements)
 
     assert captured["query"] is not None
-    assert f'FROM "{table_name}"' in captured["query"]
+    # Expect backticks for BigQuery provider
+    assert f"FROM `{table_name}`" in captured["query"]
