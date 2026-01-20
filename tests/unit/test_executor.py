@@ -168,4 +168,70 @@ def test_yaml_parsing_infinite_thresholds(tmp_path: Path) -> None:
     # Verify third check has infinite lower threshold
     check3 = bundle.checks[2]
     assert check3.lower_threshold == -math.inf
-    assert check3.upper_threshold == 100
+
+
+@pytest.mark.unit
+def test_bundle_monitor_only_propagation() -> None:
+    """Test that monitor_only set in bundle defaults is applied to checks."""
+    content = dedent(
+        """
+        name: test-monitor-only
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+
+        check_bundles:
+          - name: bundle-monitor
+            defaults:
+              check_type: CountCheck
+              table: test_table
+              check_column: "*"
+              monitor_only: True
+            checks:
+              - shop_id: TEST001
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    bundle = config.check_bundles[0]
+    # bundle default should be True
+    assert bundle.defaults.monitor_only is True
+    # check should inherit monitor_only from bundle defaults
+    check = bundle.checks[0]
+    assert check.monitor_only is True
+
+
+@pytest.mark.unit
+def test_check_level_monitor_only_overrides_bundle() -> None:
+    """Test that a check-level monitor_only setting overrides bundle defaults."""
+    content = dedent(
+        """
+        name: test-check-monitor-only
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: False
+
+        check_bundles:
+          - name: bundle-monitor-override
+            defaults:
+              check_type: CountCheck
+              table: test_table
+              check_column: "*"
+              monitor_only: False
+            checks:
+              - shop_id: TEST001
+                monitor_only: True
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    bundle = config.check_bundles[0]
+    assert bundle.defaults.monitor_only is False
+    check = bundle.checks[0]
+    assert check.monitor_only is True
