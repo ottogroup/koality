@@ -197,6 +197,8 @@ Behavior for missing identifier values
 
 When an identifier-type filter is present but its `value` is missing or explicitly `null`, Koality substitutes a configurable placeholder for logging and naming (`defaults.identifier_placeholder`, default: `ALL`) to avoid `None` appearing in metric messages. You can override the placeholder at bundle or check level by setting `identifier_placeholder` in the corresponding defaults.
 
+Additional docs: see docs/identifier_placeholder.md for usage examples and configuration details.
+
 ### Filter Properties
 
 | Property        | Description                                                                    |
