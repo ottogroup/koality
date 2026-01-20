@@ -251,6 +251,7 @@ class TestNewFiltersSyntax:
 
     def test_identifier_placeholder_used(self) -> None:
         """When identifier filter has no value, identifier_placeholder is used in check identifier and column naming."""
+
         class DummyCheck(DataQualityCheck):
             def assemble_query(self) -> str:
                 return "SELECT 1"

@@ -42,6 +42,7 @@ def test_message_no_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None
         },
         lower_threshold=1000,
         upper_threshold=9999,
+        identifier_placeholder="ALL",
     )
     check(duckdb_client)
 
@@ -65,6 +66,7 @@ def test_message_date_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         lower_threshold=1000,
         upper_threshold=9999,
         date_info="PREDICTION_DATE = real date + 1",
+        identifier_placeholder="ALL",
     )
     check(duckdb_client)
 
@@ -88,6 +90,7 @@ def test_message_extra_info(duckdb_client: duckdb.DuckDBPyConnection) -> None:
         lower_threshold=1000,
         upper_threshold=9999,
         extra_info="Note: This is an awesome check.",
+        identifier_placeholder="ALL",
     )
     check(duckdb_client)
 
@@ -124,6 +127,7 @@ def test_message_correct_formatting() -> None:
         },
         lower_threshold=1,
         upper_threshold=1,
+        identifier_placeholder="ALL",
     )
     check(conn)
 
@@ -146,6 +150,7 @@ def test_identifier_format_filter_name(duckdb_client: duckdb.DuckDBPyConnection)
             "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
         },
         identifier_format="filter_name",
+        identifier_placeholder="ALL",
     )
     result = check(duckdb_client)
 
@@ -168,6 +173,7 @@ def test_identifier_format_column_name(duckdb_client: duckdb.DuckDBPyConnection)
             "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
         },
         identifier_format="column_name",
+        identifier_placeholder="ALL",
     )
     result = check(duckdb_client)
 
@@ -213,6 +219,7 @@ def test_missing_table_maps_to_table_exists() -> None:
             "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
             "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
         },
+        identifier_placeholder="ALL",
     )
 
     result = check.check(conn)

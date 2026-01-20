@@ -22,6 +22,7 @@ Types of changes:
 - Map provider/table-not-found errors to a unified `table_exists` metric
 - Support identifier-type filters without explicit column/value for naming; add `identifier_format` option (`identifier`, `filter_name`, `column_name`) to control the result identifier column
 - Treat identifier filters with missing/null `value` as a configurable placeholder for logging and naming (defaults to `ALL`)
+- Add `identifier_placeholder` option to configure the placeholder value used when identifier filters lack a value; defaults to `ALL` and is applied to the result IDENTIFIER column and logging for clearer partition naming.
 
 ## [0.9.0] - 2026-01-16
 
