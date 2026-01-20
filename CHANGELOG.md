@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Added
+
+- Allow setting `monitor_only` on check bundles and on individual checks
+
 ## [0.9.0] - 2026-01-16
 
 ### Changed

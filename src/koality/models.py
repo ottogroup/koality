@@ -166,6 +166,7 @@ class _Defaults(BaseModel):
 
 
 class _LocalDefaults(_Defaults):
+    monitor_only: bool = False
     check_type: CHECK_TYPE | None = None
     check_column: str | None = None
     lower_threshold: float = -math.inf
