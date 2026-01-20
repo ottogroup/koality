@@ -183,6 +183,16 @@ defaults:
       operator: ">="       # Supports =, !=, >, >=, <, <=, IN, NOT IN, LIKE, NOT LIKE
 ```
 
+Identifier filters and naming
+
+Koality supports an `identifier` filter type which can be used to mark the field that identifies data partitions (e.g., shop, tenant). Use the global `identifier_format` setting in `defaults` to control how the identifier appears in result rows:
+
+- `identifier` (default): result column `IDENTIFIER` contains `column=value` (e.g., `shop_code=EC0601`).
+- `filter_name`: result column uses the filter name (e.g., `SHOP_ID`) and contains the value only.
+- `column_name`: result column uses the database column name (e.g., `SHOP_CODE`) and contains the value only.
+
+If an identifier-type filter is defined without a concrete `column` or `value` (for example in global `defaults`), it is treated as a naming-only hint and will not be turned into a WHERE clause; this is useful when you only want to control the result identifier column name (e.g., `SHOP_ID`) across checks.
+
 ### Filter Properties
 
 | Property        | Description                                                                    |

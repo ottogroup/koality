@@ -233,6 +233,22 @@ class TestNewFiltersSyntax:
             "shop_id": {"column": "shop_code", "value": "SHOP001", "operator": "=", "type": "other"},
         }
 
+    def test_identifier_naming_only_filter_parsed(self) -> None:
+        """Identifier-type filters without column/value are accepted as naming hints."""
+        kwargs = {"filters": {"shop_id": {"type": "identifier"}}}
+        result = DataQualityCheck.get_filters(kwargs.get("filters", {}))
+        assert result == {"shop_id": {"value": None, "operator": "=", "type": "identifier"}}
+
+    def test_assemble_where_skips_naming_only_identifier(self) -> None:
+        """assemble_where_statement should ignore naming-only identifier filters when building WHERE."""
+        filters = {
+            "shop_id": {"type": "identifier", "value": None},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        }
+        where_sql = DataQualityCheck.assemble_where_statement(filters)
+        assert "shop_id" not in where_sql
+        assert "DATE" in where_sql
+
 
 class TestOperatorFilters:
     """Tests for filter operator functionality."""

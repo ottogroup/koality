@@ -450,19 +450,36 @@ class Config(BaseModel):
         """Validate that all filters in checks have column and value set.
 
         Filters in defaults can omit column/value (to be set at check level),
-        but after merging, all filters must have both column and value.
+        but after merging, all filters must have both column and value except for
+        identifier-type filters which are allowed to omit a value (used for naming).
         """
         for bundle in self.check_bundles:
             for check in bundle.checks:
                 for name, config in check.filters.items():
-                    if config.column is None:
+                    # Non-identifier filters must define a column
+                    if config.type != "identifier" and config.column is None:
                         msg = (
                             f"Filter '{name}' in check '{check.check_type}' "
                             f"(bundle '{bundle.name}') is missing a column. "
                             f"Set column in defaults, bundle defaults, or the check itself."
                         )
                         raise ValueError(msg)
-                    if config.value is None and config.operator == "=":
+                    # For identifier filters, a missing value is allowed only when the
+                    # global identifier_format is not 'identifier' (i.e., used solely for naming).
+                    if config.type == "identifier":
+                        if (
+                            self.defaults.identifier_format == "identifier"
+                            and config.value is None
+                            and config.operator == "="
+                        ):
+                            msg = (
+                                f"Filter '{name}' in check '{check.check_type}' "
+                                f"(bundle '{bundle.name}') is missing a value. "
+                                f"Set value in defaults, bundle defaults, or the check itself."
+                            )
+                            raise ValueError(msg)
+                    # Require a value for non-identifier filters (unless operator explicitly allows None)
+                    elif config.value is None and config.operator == "=":
                         msg = (
                             f"Filter '{name}' in check '{check.check_type}' "
                             f"(bundle '{bundle.name}') is missing a value. "

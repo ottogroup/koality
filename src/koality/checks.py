@@ -309,8 +309,6 @@ class DataQualityCheck(abc.ABC):
                 config_dict = {"value": config}
 
             column = config_dict.get("column")
-            if column is None:
-                continue
 
             value = config_dict.get("value")
             filter_type = config_dict.get("type", "other")
@@ -322,12 +320,22 @@ class DataQualityCheck(abc.ABC):
 
             operator = config_dict.get("operator", "=")
 
-            filters[filter_name] = {
-                "column": column,
+            # If no column is provided, only allow identifier-type filters (used for naming);
+            # otherwise skip the filter entirely.
+            if column is None and filter_type != "identifier":
+                continue
+
+            # Build filter entry; omit 'column' key if column is not provided so
+            # downstream code can distinguish filters intended only for naming.
+            entry: dict[str, Any] = {
                 "value": value,
                 "operator": operator,
                 "type": filter_type,
             }
+            if column is not None:
+                entry["column"] = column
+
+            filters[filter_name] = entry
 
         return filters
 
@@ -404,9 +412,13 @@ class DataQualityCheck(abc.ABC):
 
         filters_statements = []
         for filter_dict in filters.values():
-            column = filter_dict["column"]
-            value = filter_dict["value"]
-            if filter_dict.get("type") == "identifier" and value == "*":
+            column = filter_dict.get("column")
+            value = filter_dict.get("value")
+            # Skip identifier filters that do not specify a concrete value (used only for naming)
+            if filter_dict.get("type") == "identifier" and (value is None or value == "*"):
+                continue
+            # If column is not provided we cannot build a WHERE condition
+            if column is None:
                 continue
             operator = filter_dict.get("operator", "=")
 
