@@ -318,6 +318,7 @@ class CheckExecutor:
                 check_kwargs["database_accessor"] = self.config.database_accessor
                 check_kwargs["database_provider"] = self.database_provider
                 check_kwargs["identifier_format"] = self.config.defaults.identifier_format
+                check_kwargs["identifier_placeholder"] = self.config.defaults.identifier_placeholder
                 check_instance = check_factory(**check_kwargs)
                 self.checks.append(check_instance)
 

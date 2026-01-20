@@ -406,6 +406,8 @@ filters:
 
 The identifier value appears in check results and failure messages. How it's formatted depends on the `identifier_format` global setting.
 
+For more details about naming-only identifier filters and the `identifier_placeholder` option, see the guide: [Identifier filters and naming](../identifier_filters.md).
+
 ### Date Filters
 
 When `type: date` is set, the value is automatically parsed as a date. Supported formats:

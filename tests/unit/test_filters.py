@@ -249,6 +249,29 @@ class TestNewFiltersSyntax:
         assert "shop_id" not in where_sql
         assert "DATE" in where_sql
 
+    def test_identifier_placeholder_used(self) -> None:
+        """When identifier filter has no value, identifier_placeholder is used in check identifier and column naming."""
+        class DummyCheck(DataQualityCheck):
+            def assemble_query(self) -> str:
+                return "SELECT 1"
+
+            def assemble_data_exists_query(self) -> str:
+                return "SELECT '' AS empty_table"
+
+            def assemble_name(self) -> str:
+                return "dummy"
+
+        chk = DummyCheck(
+            database_accessor="",
+            database_provider=None,
+            table="t",
+            filters={"shop_id": {"type": "identifier"}},
+            identifier_format="filter_name",
+            identifier_placeholder="PLACEHOLDER",
+        )
+        assert chk.identifier == "PLACEHOLDER"
+        assert chk.identifier_column == "SHOP_ID"
+
 
 class TestOperatorFilters:
     """Tests for filter operator functionality."""
