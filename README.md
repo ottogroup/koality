@@ -193,6 +193,10 @@ Koality supports an `identifier` filter type which can be used to mark the field
 
 If an identifier-type filter is defined without a concrete `column` or `value` (for example in global `defaults`), it is treated as a naming-only hint and will not be turned into a WHERE clause; this is useful when you only want to control the result identifier column name (e.g., `SHOP_ID`) across checks.
 
+Behavior for missing identifier values
+
+When an identifier-type filter is present but its `value` is missing or explicitly `null`, Koality substitutes a configurable placeholder for logging and naming (`defaults.identifier_placeholder`, default: `ALL`) to avoid `None` appearing in metric messages. You can override the placeholder at bundle or check level by setting `identifier_placeholder` in the corresponding defaults.
+
 ### Filter Properties
 
 | Property        | Description                                                                    |

@@ -179,6 +179,8 @@ class _GlobalDefaults(_Defaults):
     monitor_only: bool = False
     result_table: str | None = None
     identifier_format: IdentifierFormat = "identifier"
+    # Placeholder used when an identifier filter has no concrete value (e.g., naming-only filters)
+    identifier_placeholder: str = "ALL"
 
     @computed_field
     def persist_results(self) -> bool:

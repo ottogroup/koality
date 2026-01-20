@@ -41,6 +41,7 @@ class DataQualityCheck(abc.ABC):
         *,
         filters: dict[str, Any] | None = None,
         identifier_format: str = "identifier",
+        identifier_placeholder: str = "ALL",
         date_info: str | None = None,
         extra_info: str | None = None,
         monitor_only: bool = False,
@@ -62,6 +63,7 @@ class DataQualityCheck(abc.ABC):
 
         # Identifier format configuration
         self.identifier_format = identifier_format
+        self.identifier_placeholder = identifier_placeholder
 
         # for where filter handling
         self.filters = self.get_filters(filters or {})
@@ -70,7 +72,11 @@ class DataQualityCheck(abc.ABC):
         identifier_filter_result = self.get_identifier_filter(self.filters)
         if identifier_filter_result:
             filter_name, filter_config = identifier_filter_result
-            value = filter_config.get("value", "ALL")
+            # If value key is missing or explicitly None, treat as identifier_placeholder (meaning "no specific value")
+            if "value" in filter_config and filter_config["value"] is not None:
+                value = filter_config["value"]
+            else:
+                value = self.identifier_placeholder
             column = filter_config.get("column", "")
 
             if self.identifier_format == "identifier":
