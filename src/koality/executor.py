@@ -215,6 +215,33 @@ class CheckExecutor:
         """
         data_requirements = defaultdict(lambda: defaultdict(set))
         for check in self.checks:
+            # Skip synthetic JOIN table entries created for MatchRateCheck; handle left/right tables explicitly
+            if isinstance(check, MatchRateCheck):
+                # Add columns and filter columns for left table
+                if check.check_column and check.check_column != "*":
+                    data_requirements[check.left_table]["columns"].add(check.check_column)
+                for _filter in check.filters_left.values():
+                    if "column" in _filter:
+                        data_requirements[check.left_table]["columns"].add(_filter["column"])
+                data_requirements[check.left_table]["columns"].update(check.join_columns_left)
+
+                # Add only filter and join columns for right table (check_column is only from left table)
+                for _filter in check.filters_right.values():
+                    if "column" in _filter:
+                        data_requirements[check.right_table]["columns"].add(_filter["column"])
+                data_requirements[check.right_table]["columns"].update(check.join_columns_right)
+
+                # Store unique filter configurations for both tables
+                filter_key_left = frozenset(
+                    (name, frozenset(config.items())) for name, config in check.filters_left.items()
+                )
+                filter_key_right = frozenset(
+                    (name, frozenset(config.items())) for name, config in check.filters_right.items()
+                )
+                data_requirements[check.left_table]["filters"].add(filter_key_left)
+                data_requirements[check.right_table]["filters"].add(filter_key_right)
+                continue
+
             table_name = check.table
             check_filters = check.filters
             # Add check-specific columns and filter columns to the requirements
@@ -224,16 +251,12 @@ class CheckExecutor:
                 if "column" in _filter:
                     data_requirements[table_name]["columns"].add(_filter["column"])
 
-            # For MatchRateCheck, add columns from both left and right tables
-            if isinstance(check, MatchRateCheck):
-                data_requirements[check.left_table]["columns"].update(check.join_columns_left)
-                data_requirements[check.right_table]["columns"].update(check.join_columns_right)
-                for _filter in check.filters_left.values():
-                    if "column" in _filter:
-                        data_requirements[check.left_table]["columns"].add(_filter["column"])
-                for _filter in check.filters_right.values():
-                    if "column" in _filter:
-                        data_requirements[check.right_table]["columns"].add(_filter["column"])
+            if isinstance(check, IqrOutlierCheck):
+                check_filters = {k: v for k, v in check.filters.items() if v.get("type") != "date"}
+
+            # Store unique filter configurations for each table
+            filter_key = frozenset((name, frozenset(config.items())) for name, config in check_filters.items())
+            data_requirements[table_name]["filters"].add(filter_key)
 
             if isinstance(check, IqrOutlierCheck):
                 check_filters = {k: v for k, v in check.filters.items() if v.get("type") != "date"}
@@ -271,10 +294,16 @@ class CheckExecutor:
             if all_filters_sql:
                 final_where_clause = "WHERE " + " OR ".join(all_filters_sql)
 
+            # Determine appropriate table quoting depending on database provider
+            if self.database_provider and getattr(self.database_provider, "type", "").lower() == "bigquery":
+                table_ref = f"`{table}`"
+            else:
+                table_ref = f'"{table}"'
+
             # Construct the bulk SELECT query
             select_query = f"""
             SELECT {columns}
-            FROM "{table}"
+            FROM {table_ref}
             {final_where_clause}
             """  # noqa: S608
 
