@@ -24,6 +24,10 @@ Types of changes:
 - Treat identifier filters with missing/null `value` as a configurable placeholder for logging and naming (defaults to `ALL`)
 - Add `identifier_placeholder` option to configure the placeholder value used when identifier filters lack a value; defaults to `ALL` and is applied to the result IDENTIFIER column and logging for clearer partition naming.
 
+### Fixed
+
+- Quote table identifiers in bulk SELECTs when loading data into DuckDB memory to avoid BigQuery binder errors for identifiers that look like project IDs (e.g., `EC0601`). Added an integration test covering the quoting behavior.
+
 ## [0.9.0] - 2026-01-16
 
 ### Changed

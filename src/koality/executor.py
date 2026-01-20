@@ -274,7 +274,7 @@ class CheckExecutor:
             # Construct the bulk SELECT query
             select_query = f"""
             SELECT {columns}
-            FROM {table}
+            FROM "{table}"
             {final_where_clause}
             """  # noqa: S608
 
