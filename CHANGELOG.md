@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.11.0] - 2026-01-22
+
 ### Fixed
 
 - Ensure data loaded into DuckDB memory respects all configured filters and rolling windows (e.g., `RelCountChangeCheck` now applies date-range and identifier filters when fetching data into memory). Added `__date_range__` handling in the executor and a new integration test covering the rolling-window fetch behavior.
@@ -174,7 +176,9 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.9.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.11.0...HEAD
+[0.11.0]: https://github.com/ottogroup/koality/compare/v0.10.0...v0.11.0
+[0.10.0]: https://github.com/ottogroup/koality/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ottogroup/koality/compare/v0.8.0...v0.9.0
 [0.8.0]: https://github.com/ottogroup/koality/compare/v0.7.0...v0.8.0
 [0.7.0]: https://github.com/ottogroup/koality/compare/v0.6.0...v0.7.0
