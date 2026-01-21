@@ -74,6 +74,7 @@ def execute_query(
 
             return duckdb_client.query(wrapped_query)
         log.info("Database is of type '%s'. Using standard query execution.", database_provider.type)
+
     return duckdb_client.query(query)
 
 

@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Ensure data loaded into DuckDB memory respects all configured filters and rolling windows (e.g., `RelCountChangeCheck` now applies date-range and identifier filters when fetching data into memory). Added `__date_range__` handling in the executor and a new integration test covering the rolling-window fetch behavior.
+
 ## [0.10.0] - 2026-01-20
 
 ### Added

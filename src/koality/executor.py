@@ -1,8 +1,8 @@
 """Module containing the actual check execution logic."""
 
-import datetime
 import logging
 from collections import defaultdict
+from datetime import datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -27,6 +27,9 @@ from koality.checks import (
 from koality.exceptions import DatabaseError
 from koality.models import CHECK_TYPE, Config
 from koality.utils import execute_query, format_threshold, identify_database_provider
+
+# Internal constants
+_DATE_RANGE_TUPLE_SIZE = 2
 
 logging.basicConfig(level=logging.INFO)
 log = logging.getLogger(__name__)
@@ -202,7 +205,7 @@ class CheckExecutor:
 
         return table, database_accessor, date_value, filters_key
 
-    def get_data_requirements(self) -> defaultdict[str, defaultdict[str, set]]:  # noqa: C901
+    def get_data_requirements(self) -> defaultdict[str, defaultdict[str, set]]:  # noqa: C901, PLR0912, PLR0915
         """Aggregate data requirements from all checks.
 
         This method collects all required tables, columns, and filter configurations
@@ -251,12 +254,57 @@ class CheckExecutor:
                 if "column" in _filter:
                     data_requirements[table_name]["columns"].add(_filter["column"])
 
+            # Ensure date column is included in the requirements when the check provides a date_filter
+            if getattr(check, "date_filter", None):
+                date_col = check.date_filter.get("column")
+                if date_col:
+                    data_requirements[table_name]["columns"].add(date_col)
+
             if isinstance(check, IqrOutlierCheck):
                 check_filters = {k: v for k, v in check.filters.items() if v.get("type") != "date"}
 
             # Store unique filter configurations for each table
             filter_key = frozenset((name, frozenset(config.items())) for name, config in check_filters.items())
             data_requirements[table_name]["filters"].add(filter_key)
+
+            # For rolling-style checks we also need to ensure historic date ranges are fetched.
+            # Add an explicit BETWEEN-style filter group so fetch_data_into_memory can restrict rows.
+            if getattr(check, "date_filter", None):
+                date_col = check.date_filter.get("column")
+                date_val = check.date_filter.get("value")
+                if date_col and date_val is not None:
+                    # Default window size for rolling checks
+                    if isinstance(check, RelCountChangeCheck):
+                        window_days = int(check.rolling_days)
+                    elif isinstance(check, IqrOutlierCheck):
+                        window_days = int(check.interval_days)
+                    elif isinstance(check, RollingValuesInSetCheck):
+                        # RollingValuesInSetCheck currently uses a 14-day window
+                        window_days = 14
+                    else:
+                        window_days = 0
+
+                    if window_days > 0:
+                        # For hashability store the concrete date strings as tuple (start_iso, end_iso)
+                        # compute actual ISO dates by naive arithmetic here (date_val is already ISO string)
+                        try:
+                            end_iso = str(date_val)
+                            start_iso = (
+                                (datetime.fromisoformat(str(date_val)) - timedelta(days=window_days)).date().isoformat()
+                            )
+                        except (ValueError, TypeError):
+                            start_iso = None
+                            end_iso = str(date_val)
+
+                        between_config = {
+                            "column": date_col,
+                            "operator": "BETWEEN",
+                            "value": (start_iso, end_iso),
+                            "type": "date",
+                        }
+                        # Construct filter_key_between in the same shape as other filter keys
+                        filter_key_between = frozenset((("__date_range__", frozenset(between_config.items())),))
+                        data_requirements[table_name]["filters"].add(filter_key_between)
 
             if isinstance(check, IqrOutlierCheck):
                 check_filters = {k: v for k, v in check.filters.items() if v.get("type") != "date"}
@@ -266,7 +314,7 @@ class CheckExecutor:
             data_requirements[table_name]["filters"].add(filter_key)
         return data_requirements
 
-    def fetch_data_into_memory(self, data_requirements: defaultdict[str, defaultdict[str, set]]) -> None:
+    def fetch_data_into_memory(self, data_requirements: defaultdict[str, defaultdict[str, set]]) -> None:  # noqa: C901, PLR0915, PLR0912
         """Fetch all required data into DuckDB memory before executing checks.
 
         This method aggregates all data requirements (tables, columns, filters) from the checks,
@@ -278,21 +326,51 @@ class CheckExecutor:
             if not columns:
                 columns = "*"
 
-            # Combine all unique filter groups with OR
-            all_filters_sql = set()
-            for filter_group in requirements["filters"]:
-                filter_dict = {name: dict(config) for name, config in filter_group}
-                where_clause = DataQualityCheck.assemble_where_statement(filter_dict)
-                # Extract the conditions from the WHERE clause
-                if where_clause.strip().startswith("WHERE"):
-                    conditions = where_clause.strip()[len("WHERE") :].strip()
-                    if conditions:
-                        all_filters_sql.add(f"({conditions})")
+            # Combine all unique filter groups. Treat date-range filters specially and
+            # combine them with other filters using AND (date range applies to all other filters).
+            date_filters_sql = set()
+            other_filters_sql = set()
 
-            # Build the final WHERE clause
+            for filter_group in requirements["filters"]:
+                filter_dict = {}
+                for item in filter_group:
+                    # Expect each item to be a (name, frozenset(cfg_items)) tuple
+                    if not (isinstance(item, tuple) and len(item) == _DATE_RANGE_TUPLE_SIZE):
+                        # Skip unexpected shapes
+                        continue
+                    name, cfg_items = item
+                    cfg = dict(cfg_items)
+                    if name == "__date_range__":
+                        col = cfg.get("column")
+                        val = cfg.get("value")
+                        if col and isinstance(val, (list, tuple)) and len(val) == _DATE_RANGE_TUPLE_SIZE and val[0]:
+                            start_iso, end_iso = val
+                            cond = f"CAST({col} AS DATE) BETWEEN DATE '{start_iso}' AND DATE '{end_iso}'"
+                            date_filters_sql.add(f"({cond})")
+                        elif col and isinstance(val, (list, tuple)) and len(val) == _DATE_RANGE_TUPLE_SIZE:
+                            cond = f"CAST({col} AS DATE) <= DATE '{val[1]}'"
+                            date_filters_sql.add(f"({cond})")
+                        # date_range handled; continue to next group
+                        continue
+                    filter_dict[name] = dict(cfg)
+
+                if filter_dict:
+                    where_clause = DataQualityCheck.assemble_where_statement(filter_dict)
+                    if where_clause.strip().startswith("WHERE"):
+                        conditions = where_clause.strip()[len("WHERE") :].strip()
+                        if conditions:
+                            other_filters_sql.add(f"({conditions})")
+
+            # Build final WHERE clause: if we have date filters, AND them with other filters (if any).
             final_where_clause = ""
-            if all_filters_sql:
-                final_where_clause = "WHERE " + " OR ".join(all_filters_sql)
+            if date_filters_sql and other_filters_sql:
+                date_part = " OR ".join(sorted(date_filters_sql))
+                other_part = " OR ".join(sorted(other_filters_sql))
+                final_where_clause = f"WHERE ({date_part}) AND ({other_part})"
+            elif date_filters_sql:
+                final_where_clause = "WHERE " + " OR ".join(sorted(date_filters_sql))
+            elif other_filters_sql:
+                final_where_clause = "WHERE " + " OR ".join(sorted(other_filters_sql))
 
             # Determine appropriate table quoting depending on database provider
             if self.database_provider and getattr(self.database_provider, "type", "").lower() == "bigquery":
