@@ -19,6 +19,7 @@ Types of changes:
 ### Fixed
 
 - Ensure data loaded into DuckDB memory respects all configured filters and rolling windows (e.g., `RelCountChangeCheck` now applies date-range and identifier filters when fetching data into memory). Added `__date_range__` handling in the executor and a new integration test covering the rolling-window fetch behavior.
+- Support filters referencing nested JSON fields (e.g., `value.shopId`) when data is flattened in-memory by using the last dot-separated segment for WHERE and SELECT operations while preserving the original nested `COLUMN` value in results and persisted rows.
 
 ## [0.10.0] - 2026-01-20
 

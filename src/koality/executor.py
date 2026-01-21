@@ -1,8 +1,8 @@
 """Module containing the actual check execution logic."""
 
+import datetime as dt
 import logging
 from collections import defaultdict
-from datetime import datetime, timedelta
 from pathlib import Path
 
 import duckdb
@@ -290,7 +290,9 @@ class CheckExecutor:
                         try:
                             end_iso = str(date_val)
                             start_iso = (
-                                (datetime.fromisoformat(str(date_val)) - timedelta(days=window_days)).date().isoformat()
+                                (dt.datetime.fromisoformat(str(date_val)) - dt.timedelta(days=window_days))
+                                .date()
+                                .isoformat()
                             )
                         except (ValueError, TypeError):
                             start_iso = None
@@ -322,9 +324,45 @@ class CheckExecutor:
         This avoids executing a separate query for each check.
         """
         for table, requirements in data_requirements.items():
-            columns = ", ".join(sorted(set(requirements["columns"])))
-            if not columns:
+            # Use configured column names when building the SELECT list. For columns that
+            # reference nested fields (e.g., "value.shopId") keep the configured expression
+            # in the SELECT but alias it to the flattened in-memory column name ("shopId").
+            # This preserves the configured prefix in the SELECT while ensuring checks can
+            # reference the flattened column name when querying the in-memory table.
+            raw_cols = sorted(set(requirements["columns"]))
+            if not raw_cols:
                 columns = "*"
+            else:
+                seen_flats: dict[str, str] = {}
+                select_parts: list[str] = []
+                for col in raw_cols:
+                    if col == "*":
+                        select_parts.append("*")
+                        continue
+                    if isinstance(col, str) and "." in col:
+                        flat = col.split(".")[-1]
+                        # Make flattened name unique if duplicate arises
+                        base = flat
+                        idx = 1
+                        while flat in seen_flats:
+                            flat = f"{base}_{idx}"
+                            idx += 1
+                        seen_flats[flat] = col
+                        select_parts.append(f"{col} AS {flat}")
+                    # Non-nested column, ensure uniqueness
+                    elif col in seen_flats:
+                        base = col
+                        idx = 1
+                        new_col = col
+                        while new_col in seen_flats:
+                            new_col = f"{base}_{idx}"
+                            idx += 1
+                        seen_flats[new_col] = col
+                        select_parts.append(f"{col} AS {new_col}")
+                    else:
+                        seen_flats[col] = col
+                        select_parts.append(col)
+                columns = ", ".join(select_parts)
 
             # Combine all unique filter groups. Treat date-range filters specially and
             # combine them with other filters using AND (date range applies to all other filters).
@@ -355,7 +393,11 @@ class CheckExecutor:
                     filter_dict[name] = dict(cfg)
 
                 if filter_dict:
-                    where_clause = DataQualityCheck.assemble_where_statement(filter_dict)
+                    # When fetching from the source DB, preserve dotted column expressions
+                    # (e.g., "value.shopId") in the WHERE so the source provider sees the
+                    # original column reference. The assemble_where_statement default strips
+                    # dotted prefixes; pass strip_dotted_columns=False here to keep them.
+                    where_clause = DataQualityCheck.assemble_where_statement(filter_dict, strip_dotted_columns=False)
                     if where_clause.strip().startswith("WHERE"):
                         conditions = where_clause.strip()[len("WHERE") :].strip()
                         if conditions:
@@ -586,7 +628,7 @@ class CheckExecutor:
             log.info("No entries in results from checks, so no results were persisted.")
             return
 
-        now = datetime.datetime.now(tz=datetime.UTC)
+        now = dt.datetime.now(tz=dt.UTC)
 
         # Get the identifier column name from the first check (all checks have the same column name)
         identifier_column = self.checks[0].identifier_column if self.checks else "IDENTIFIER"
