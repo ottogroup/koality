@@ -111,6 +111,19 @@ class DataQualityCheck(abc.ABC):
         self.result: dict[str, Any] | None = None
 
     @property
+    def in_memory_column(self) -> str:
+        """Return the column name to reference in in-memory queries.
+
+        If a configured column references a nested field (e.g. "value.shopId"),
+        the in-memory representation uses the last segment ("shopId"). This
+        property provides that flattened name without modifying the original
+        configured `self.check_column` which is still used for result writing.
+        """
+        if isinstance(self.check_column, str) and "." in self.check_column:
+            return self.check_column.split(".")[-1]
+        return self.check_column
+
+    @property
     def query(self) -> str:
         """Return the assembled SQL query for this check."""
         return self.assemble_query()
@@ -378,11 +391,17 @@ class DataQualityCheck(abc.ABC):
         return None
 
     @staticmethod
-    def assemble_where_statement(filters: dict[str, dict[str, Any]]) -> str:
+    def assemble_where_statement(filters: dict[str, dict[str, Any]], *, strip_dotted_columns: bool = True) -> str:
         """Generate the where statement for the check query using the specified filters.
 
         Args:
             filters: A dict containing filter specifications, e.g.,
+            strip_dotted_columns: When True (default), dotted column names (e.g. "a.b") are
+                reduced to their last component ("b") for WHERE clauses. If False, the full
+                dotted expression is preserved. This is useful when querying source databases
+                that expect the original dotted column syntax.
+
+                Example filters:
                 `{
                     'identifier': {
                         'column': 'shop_code',
@@ -426,6 +445,15 @@ class DataQualityCheck(abc.ABC):
             # If column is not provided we cannot build a WHERE condition
             if column is None:
                 continue
+            # If the column references a nested field (e.g. "value.shopId"),
+            # databases that flatten JSON may have the column stored without the
+            # prefix. By default we use the last component after the dot for the
+            # WHERE clause, but callers can disable this behavior by setting
+            # `strip_dotted_columns=False` (used when querying source DBs so the
+            # original dotted expression is preserved).
+            if isinstance(column, str) and "." in column and strip_dotted_columns:
+                column = column.split(".")[-1]
+
             operator = filter_dict.get("operator", "=")
 
             # Handle NULL values with IS NULL / IS NOT NULL
@@ -598,7 +626,7 @@ class NullRatioCheck(ColumnTransformationCheck):
         return f"""
             CASE
                 WHEN COUNT(*) = 0 THEN 0.0
-                ELSE ROUND(COUNTIF({self.check_column} IS NULL) / COUNT(*), 3)
+                ELSE ROUND(COUNTIF({self.in_memory_column} IS NULL) / COUNT(*), 3)
             END AS {self.name}
         """
 
@@ -664,7 +692,7 @@ class RegexMatchCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for calculating regex match ratio."""
-        return f"""AVG(IF(regexp_matches({self.check_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
+        return f"""AVG(IF(regexp_matches({self.in_memory_column}, '{self.regex_to_match}'), 1, 0)) AS {self.name}"""
 
 
 class ValuesInSetCheck(ColumnTransformationCheck):
@@ -739,7 +767,7 @@ class ValuesInSetCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for calculating values in set ratio."""
-        return f"""AVG(IF({self.check_column} IN {self.value_set_string}, 1, 0)) AS {self.name}"""
+        return f"""AVG(IF({self.in_memory_column} IN {self.value_set_string}, 1, 0)) AS {self.name}"""
 
 
 class RollingValuesInSetCheck(ValuesInSetCheck):
@@ -893,7 +921,7 @@ class DuplicateCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for counting duplicates."""
-        return f"COUNT(*) - COUNT(DISTINCT {self.check_column}) AS {self.name}"
+        return f"COUNT(*) - COUNT(DISTINCT {self.in_memory_column}) AS {self.name}"
 
 
 class CountCheck(ColumnTransformationCheck):
@@ -968,9 +996,9 @@ class CountCheck(ColumnTransformationCheck):
     def transformation_statement(self) -> str:
         """Return the SQL statement for counting rows or distinct values."""
         if self.distinct:
-            return f"COUNT(DISTINCT {self.check_column}) AS {self.name}"
+            return f"COUNT(DISTINCT {self.in_memory_column}) AS {self.name}"
 
-        return f"COUNT({self.check_column}) AS {self.name}"
+        return f"COUNT({self.in_memory_column}) AS {self.name}"
 
     def assemble_name(self) -> str:
         """Return the check name, using 'row_' prefix for wildcard columns."""
@@ -1019,7 +1047,7 @@ class AverageCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for computing the average."""
-        return f"AVG({self.check_column}) AS {self.name}"
+        return f"AVG({self.in_memory_column}) AS {self.name}"
 
 
 class MaxCheck(ColumnTransformationCheck):
@@ -1061,7 +1089,7 @@ class MaxCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for computing the maximum."""
-        return f"MAX({self.check_column}) AS {self.name}"
+        return f"MAX({self.in_memory_column}) AS {self.name}"
 
 
 class MinCheck(ColumnTransformationCheck):
@@ -1103,7 +1131,7 @@ class MinCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for computing the minimum."""
-        return f"MIN({self.check_column}) AS {self.name}"
+        return f"MIN({self.in_memory_column}) AS {self.name}"
 
 
 class OccurrenceCheck(ColumnTransformationCheck):
@@ -1173,7 +1201,7 @@ class OccurrenceCheck(ColumnTransformationCheck):
 
     def transformation_statement(self) -> str:
         """Return the SQL statement for counting occurrences."""
-        return f"{self.check_column}, COUNT(*) AS {self.name}"
+        return f"{self.in_memory_column}, COUNT(*) AS {self.name}"
 
     def assemble_query(self) -> str:
         """Assemble query to find max or min occurrence of any value."""
@@ -1183,7 +1211,7 @@ class OccurrenceCheck(ColumnTransformationCheck):
         return f"""
             {self.query_boilerplate(self.transformation_statement())}
             {self.assemble_where_statement(self.filters)}
-            GROUP BY {self.check_column}
+            GROUP BY {self.in_memory_column}
             ORDER BY {self.name} {order}
             LIMIT 1  -- only the first entry is needed
         """
@@ -1479,7 +1507,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             base AS (
                 SELECT
                     CAST({date_col} AS DATE) AS date_col_cast,
-                    COUNT(DISTINCT {self.check_column}) AS dist_cnt
+                    COUNT(DISTINCT {self.in_memory_column}) AS dist_cnt
                 FROM
                     "{self.table}"
                 WHERE
@@ -1662,7 +1690,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             base AS (
                 SELECT
                     DATE({date_col}) AS {date_col},
-                    {self.check_column}
+                    {self.in_memory_column}
                     {filter_columns}
                 FROM
                     "{self.table}"
@@ -1679,15 +1707,15 @@ class IqrOutlierCheck(ColumnTransformationCheck):
             ),
             percentiles AS (
                 SELECT
-                  QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.25) AS q25,
-                  QUANTILE_CONT(CAST({self.check_column} AS FLOAT), 0.75) AS q75
+                  QUANTILE_CONT(CAST({self.in_memory_column} AS FLOAT), 0.25) AS q25,
+                  QUANTILE_CONT(CAST({self.in_memory_column} AS FLOAT), 0.75) AS q75
                 FROM
                   compare
             ),
             stats AS (
                 SELECT
-                  * exclude ({self.check_column}),
-                  {self.check_column} AS {self.name},
+                  * exclude ({self.in_memory_column}),
+                  {self.in_memory_column} AS {self.name},
                   (percentiles.q25 - {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS lower_threshold,
                   (percentiles.q75 + {self.iqr_factor} * (percentiles.q75 - percentiles.q25)) AS upper_threshold,
                 FROM
@@ -1723,7 +1751,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         """Assemble the query to check if data exists for IQR outlier detection."""
         data_exists_query = f"""
         SELECT
-            IF(COUNTIF({self.check_column} IS NOT NULL) > 0, '', '{self.table}') AS empty_table
+            IF(COUNTIF({self.in_memory_column} IS NOT NULL) > 0, '', '{self.table}') AS empty_table
         FROM
             "{self.table}"
         """
