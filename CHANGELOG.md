@@ -16,6 +16,11 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Ensure all check classes accept and forward `identifier_placeholder` so naming-only identifier filters use the configured placeholder for result naming and logging. Add unit tests covering the behavior.
+
+
 ## [0.11.0] - 2026-01-22
 
 ### Fixed
