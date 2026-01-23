@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Add `identifier_placeholder` parameter to all missing relevant check functions and forward to constructors
+
 ## [0.11.1] - 2026-01-22
 
 ### Fixed
