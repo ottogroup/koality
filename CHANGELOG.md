@@ -16,6 +16,15 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Improve nested/dotted column handling: when data is loaded from external sources via database accessors, nested 
+  columns (e.g., `value.shopId`) are now aliased with underscores (`value_shopId`) for consistent querying. Native 
+  DuckDB struct columns continue to use dot notation. This ensures proper handling in WHERE clauses, JOIN conditions, 
+  and SELECT statements across all check types.
+- Consolidate date-type filters to be ORed together (instead of ANDed) when fetching data into memory, allowing multiple
+  date conditions to apply correctly.
+
 ## [0.11.2] - 2026-01-23
 
 ### Fixed

@@ -192,6 +192,32 @@ class _GlobalDefaults(_Defaults):
 class _Check(_LocalDefaults):
     """Base model for all check configurations."""
 
+    @model_validator(mode="after")
+    def validate_filters_have_columns(self) -> Self:
+        """Validate that all filters with concrete values have columns specified.
+
+        This validation runs after defaults merging, ensuring the final filter
+        configuration is complete.
+        """
+        for filter_name, filter_config in self.filters.items():
+            # Skip identifier filters without concrete values (naming-only)
+            if filter_config.type == "identifier" and (filter_config.value is None or filter_config.value == "*"):
+                continue
+
+            # Skip partial filters with no value
+            if filter_config.value is None:
+                continue
+
+            # Filter has a value but no column - this is an error
+            if filter_config.column is None:
+                msg = (
+                    f"Filter '{filter_name}' has value '{filter_config.value}' "
+                    f"but no column specified. Add 'column: <column_name>' to the filter definition."
+                )
+                raise ValueError(msg)
+
+        return self
+
 
 class _SingleTableCheck(_Check):
     """Base model for checks that operate on a single table."""

@@ -114,13 +114,20 @@ class DataQualityCheck(abc.ABC):
     def in_memory_column(self) -> str:
         """Return the column name to reference in in-memory queries.
 
-        If a configured column references a nested field (e.g. "value.shopId"),
-        the in-memory representation uses the last segment ("shopId"). This
-        property provides that flattened name without modifying the original
+        If a configured column references a nested field (e.g. "value.shopId"):
+        - When querying data loaded via database_accessor: uses underscores ("value_shopId")
+          because the executor flattens struct columns with underscore aliases
+        - When querying existing DuckDB tables (no accessor): keeps dots ("value.shopId")
+          to support native DuckDB struct column syntax
+
+        This property provides the appropriate name without modifying the original
         configured `self.check_column` which is still used for result writing.
         """
-        if isinstance(self.check_column, str) and "." in self.check_column:
-            return self.check_column.split(".")[-1]
+        if isinstance(self.check_column, str) and "." in self.check_column:  # noqa: SIM102
+            # Only convert to underscores if data was loaded via database_accessor
+            # (which flattens structs). For native DuckDB tables, keep dotted notation.
+            if self.database_accessor:
+                return self.check_column.replace(".", "_")
         return self.check_column
 
     @property
@@ -391,15 +398,25 @@ class DataQualityCheck(abc.ABC):
         return None
 
     @staticmethod
-    def assemble_where_statement(filters: dict[str, dict[str, Any]], *, strip_dotted_columns: bool = True) -> str:
+    def assemble_where_statement(  # noqa: C901
+        filters: dict[str, dict[str, Any]],
+        *,
+        strip_dotted_columns: bool = True,
+        database_accessor: str | None = None,
+    ) -> str:
         """Generate the where statement for the check query using the specified filters.
 
         Args:
             filters: A dict containing filter specifications, e.g.,
             strip_dotted_columns: When True (default), dotted column names (e.g. "a.b") are
-                reduced to their last component ("b") for WHERE clauses. If False, the full
-                dotted expression is preserved. This is useful when querying source databases
-                that expect the original dotted column syntax.
+                transformed based on the data source:
+                - With database_accessor: converted to underscores ("a_b") for flattened data
+                - Without database_accessor: kept as dots ("a.b") for native DuckDB structs
+                If False, the full dotted expression is preserved regardless (used when
+                querying source databases that expect the original dotted column syntax).
+            database_accessor: Optional database accessor string. When provided and non-empty,
+                indicates data was loaded from external source and dotted columns should be
+                converted to underscores.
 
                 Example filters:
                 `{
@@ -445,16 +462,21 @@ class DataQualityCheck(abc.ABC):
             # If column is not provided we cannot build a WHERE condition
             if column is None:
                 continue
-            # If the column references a nested field (e.g. "value.shopId"),
-            # databases that flatten JSON may have the column stored without the
-            # prefix. By default we use the last component after the dot for the
-            # WHERE clause, but callers can disable this behavior by setting
-            # `strip_dotted_columns=False` (used when querying source DBs so the
-            # original dotted expression is preserved).
-            if isinstance(column, str) and "." in column and strip_dotted_columns:
-                column = column.split(".")[-1]
+            # If the column references a nested field (e.g. "value.shopId"):
+            # - With database_accessor: convert to underscores (value_shopId) for flattened data
+            # - Without database_accessor: keep dots (value.shopId) for native DuckDB structs
+            # Callers can disable this by setting `strip_dotted_columns=False`
+            # (used when querying source DBs where the original dotted expression is needed).
+            if isinstance(column, str) and "." in column and strip_dotted_columns and database_accessor:
+                column = column.replace(".", "_")
+                # else: keep dotted notation for native DuckDB struct support
 
             operator = filter_dict.get("operator", "=")
+
+            # Cast date columns for proper comparison
+            is_date_filter = filter_dict.get("type") == "date"
+            if is_date_filter:
+                column = f"CAST({column} AS DATE)"
 
             # Handle NULL values with IS NULL / IS NOT NULL
             if value is None:
@@ -465,6 +487,9 @@ class DataQualityCheck(abc.ABC):
                 continue
 
             formatted_value = format_filter_value(value, operator)
+            # Prefix DATE for date type filters
+            if is_date_filter and operator not in ("BETWEEN", "IN", "NOT IN"):
+                formatted_value = f"DATE {formatted_value}"
             filters_statements.append(f"    {column} {operator} {formatted_value}")
 
         if len(filters_statements) == 0:
@@ -547,7 +572,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
         if isinstance(self, IqrOutlierCheck):
             filters = {name: cfg for name, cfg in filters.items() if cfg.get("type") != "date"}
 
-        if where_statement := self.assemble_where_statement(filters):
+        if where_statement := self.assemble_where_statement(filters, database_accessor=self.database_accessor):
             return main_query + "\n" + where_statement
 
         return main_query
@@ -561,7 +586,7 @@ class ColumnTransformationCheck(DataQualityCheck, abc.ABC):
             "{self.table}"
         """
 
-        if where_statement := self.assemble_where_statement(self.filters):
+        if where_statement := self.assemble_where_statement(self.filters, database_accessor=self.database_accessor):
             return f"{data_exists_query}\n{where_statement}"
 
         return data_exists_query
@@ -861,7 +886,7 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
             f"CAST({date_col} AS DATE) BETWEEN (DATE '{date_val}' - INTERVAL 14 DAY) AND DATE '{date_val}'"
         )  # TODO: maybe parameterize interval days
 
-        if where_statement := self.assemble_where_statement(self.filters):
+        if where_statement := self.assemble_where_statement(self.filters, database_accessor=self.database_accessor):
             return main_query + "\nAND\n" + where_statement.removeprefix("WHERE\n")
 
         return main_query
@@ -1220,7 +1245,7 @@ class OccurrenceCheck(ColumnTransformationCheck):
         order = {"max": "DESC", "min": "ASC"}[self.max_or_min]
         return f"""
             {self.query_boilerplate(self.transformation_statement())}
-            {self.assemble_where_statement(self.filters)}
+            {self.assemble_where_statement(self.filters, database_accessor=self.database_accessor)}
             GROUP BY {self.in_memory_column}
             ORDER BY {self.name} {order}
             LIMIT 1  -- only the first entry is needed
@@ -1343,14 +1368,27 @@ class MatchRateCheck(DataQualityCheck):
 
     def assemble_query(self) -> str:
         """Assemble the SQL query for calculating match rate between tables."""
-        right_column_statement = ",\n    ".join(self.join_columns_right)
-
-        join_on_statement = "\n    AND\n    ".join(
-            [
-                f"lefty.{left_col} = righty.{right_col.split('.')[-1]}"
-                for left_col, right_col in zip(self.join_columns_left, self.join_columns_right, strict=False)
-            ],
-        )
+        # Transform dotted column names based on data source:
+        # - With database_accessor: convert to underscores (value.shopId → value_shopId) for flattened data
+        # - Without database_accessor: keep dots for SELECT (value.shopId), use last part for JOIN (shopId)
+        if self.database_accessor:
+            right_column_statement = ",\n    ".join([col.replace(".", "_") for col in self.join_columns_right])
+            join_on_statement = "\n    AND\n    ".join(
+                [
+                    f"lefty.{left_col.replace('.', '_')} = righty.{right_col.replace('.', '_')}"
+                    for left_col, right_col in zip(self.join_columns_left, self.join_columns_right, strict=False)
+                ],
+            )
+        else:
+            # For native DuckDB struct columns: SELECT uses dotted notation,
+            # but DuckDB names the result column as just the last part
+            right_column_statement = ",\n    ".join(self.join_columns_right)
+            join_on_statement = "\n    AND\n    ".join(
+                [
+                    f"lefty.{left_col.split('.')[-1]} = righty.{right_col.split('.')[-1]}"
+                    for left_col, right_col in zip(self.join_columns_left, self.join_columns_right, strict=False)
+                ],
+            )
 
         return f"""
         WITH
@@ -1360,14 +1398,14 @@ class MatchRateCheck(DataQualityCheck):
                     TRUE AS in_right_table
                 FROM
                     "{self.right_table}"
-                {self.assemble_where_statement(self.filters_right)}
+                {self.assemble_where_statement(self.filters_right, database_accessor=self.database_accessor)}
             ),
             lefty AS (
                 SELECT
                     *
                 FROM
                     "{self.left_table}"
-                {self.assemble_where_statement(self.filters_left)}
+                {self.assemble_where_statement(self.filters_left, database_accessor=self.database_accessor)}
             )
 
             SELECT
@@ -1397,7 +1435,7 @@ class MatchRateCheck(DataQualityCheck):
                 COUNT(*) AS right_counter,
             FROM
                 "{self.right_table}"
-            {self.assemble_where_statement(self.filters_right)}
+            {self.assemble_where_statement(self.filters_right, database_accessor=self.database_accessor)}
         ),
 
         lefty AS (
@@ -1405,7 +1443,7 @@ class MatchRateCheck(DataQualityCheck):
                 COUNT(*) AS left_counter,
             FROM
                 "{self.left_table}"
-            {self.assemble_where_statement(self.filters_left)}
+            {self.assemble_where_statement(self.filters_left, database_accessor=self.database_accessor)}
         )
 
         SELECT
@@ -1508,7 +1546,10 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
 
     def assemble_query(self) -> str:
         """Assemble the SQL query for calculating relative count change."""
-        where_statement = self.assemble_where_statement(self.filters).replace("WHERE", "AND")
+        where_statement = self.assemble_where_statement(self.filters, database_accessor=self.database_accessor).replace(
+            "WHERE",
+            "AND",
+        )
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
@@ -1573,7 +1614,7 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
-        where_statement = self.assemble_where_statement(self.filters)
+        where_statement = self.assemble_where_statement(self.filters, database_accessor=self.database_accessor)
         if where_statement:
             return f"{data_exists_query}\n{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
         return f"{data_exists_query}\nWHERE CAST({date_col} AS DATE) = DATE '{date_val}'"
@@ -1693,7 +1734,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         if filters:
             filter_columns = ",\n".join([v["column"] for v in filters.values()])
             filter_columns = ",\n" + filter_columns
-            where_statement = self.assemble_where_statement(filters)
+            where_statement = self.assemble_where_statement(filters, database_accessor=self.database_accessor)
             where_statement = "\nAND\n" + where_statement.removeprefix("WHERE\n")
         return f"""
         WITH
@@ -1770,7 +1811,7 @@ class IqrOutlierCheck(ColumnTransformationCheck):
 
         filters = {k: v for k, v in self.filters.items() if v["type"] != "date"}
 
-        where_statement = self.assemble_where_statement(filters)
+        where_statement = self.assemble_where_statement(filters, database_accessor=self.database_accessor)
         if where_statement:
             where_statement = f"{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
         else:
