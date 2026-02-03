@@ -340,7 +340,9 @@ class CheckExecutor:
                         select_parts.append("*")
                         continue
                     if isinstance(col, str) and "." in col:
-                        flat = col.split(".")[-1]
+                        # Replace dots with underscores for deterministic aliasing
+                        # e.g., "value.shopId" becomes "value_shopId"
+                        flat = col.replace(".", "_")
                         # Make flattened name unique if duplicate arises
                         base = flat
                         idx = 1
@@ -364,13 +366,15 @@ class CheckExecutor:
                         select_parts.append(col)
                 columns = ", ".join(select_parts)
 
-            # Combine all unique filter groups. Treat date-range filters specially and
-            # combine them with other filters using AND (date range applies to all other filters).
+            # Combine all unique filter groups. Separate date filters from other filters.
+            # All date-related conditions (BETWEEN ranges and date equality) should be ORed.
+            # Non-date filters should be ANDed with the date conditions.
             date_filters_sql = set()
             other_filters_sql = set()
 
             for filter_group in requirements["filters"]:
                 filter_dict = {}
+                date_filter_dict = {}
                 for item in filter_group:
                     # Expect each item to be a (name, frozenset(cfg_items)) tuple
                     if not (isinstance(item, tuple) and len(item) == _DATE_RANGE_TUPLE_SIZE):
@@ -390,8 +394,24 @@ class CheckExecutor:
                             date_filters_sql.add(f"({cond})")
                         # date_range handled; continue to next group
                         continue
-                    filter_dict[name] = dict(cfg)
+                    # Separate date-type filters from other filters
+                    if cfg.get("type") == "date":
+                        date_filter_dict[name] = dict(cfg)
+                    else:
+                        filter_dict[name] = dict(cfg)
 
+                # Process date filters separately and add to date_filters_sql
+                if date_filter_dict:
+                    where_clause = DataQualityCheck.assemble_where_statement(
+                        date_filter_dict,
+                        strip_dotted_columns=False,
+                    )
+                    if where_clause.strip().startswith("WHERE"):
+                        conditions = where_clause.strip()[len("WHERE") :].strip()
+                        if conditions:
+                            date_filters_sql.add(f"({conditions})")
+
+                # Process non-date filters
                 if filter_dict:
                     # When fetching from the source DB, preserve dotted column expressions
                     # (e.g., "value.shopId") in the WHERE so the source provider sees the
@@ -403,7 +423,7 @@ class CheckExecutor:
                         if conditions:
                             other_filters_sql.add(f"({conditions})")
 
-            # Build final WHERE clause: if we have date filters, AND them with other filters (if any).
+            # Build final WHERE clause: OR all date filters together, AND with other filters.
             final_where_clause = ""
             if date_filters_sql and other_filters_sql:
                 date_part = " OR ".join(sorted(date_filters_sql))
