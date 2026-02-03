@@ -16,6 +16,8 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.12.0] - 2026-02-03
+
 ### Fixed
 
 - Improve nested/dotted column handling: when data is loaded from external sources via database accessors, nested 
@@ -198,7 +200,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.11.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.12.0...HEAD
+[0.12.0]: https://github.com/ottogroup/koality/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ottogroup/koality/compare/v0.10.0...v0.11.0
 [0.10.0]: https://github.com/ottogroup/koality/compare/v0.9.0...v0.10.0
 [0.9.0]: https://github.com/ottogroup/koality/compare/v0.8.0...v0.9.0
