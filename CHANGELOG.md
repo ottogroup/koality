@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Fixed
+
+- Add optional `options` field to `DatabaseProvider` to handle the extra column returned by `duckdb_databases()` in DuckDB >= 1.5.0, preventing an unexpected keyword argument error in `identify_database_provider`.
+
 ## [0.12.0] - 2026-02-03
 
 ### Fixed
