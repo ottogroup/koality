@@ -777,7 +777,7 @@ class ValuesInSetCheck(ColumnTransformationCheck):
         super().__init__(
             database_accessor=database_accessor,
             database_provider=database_provider,
-            transformation_name=transformation_name if transformation_name else "values_in_set_ratio",
+            transformation_name=transformation_name or "values_in_set_ratio",
             table=table,
             check_column=check_column,
             lower_threshold=lower_threshold,
@@ -1329,8 +1329,8 @@ class MatchRateCheck(DataQualityCheck):
 
         # mypy typing does not understand that None is not possible, thus, we
         # add `or []`
-        self.join_columns_left: list[str] = join_columns_left if join_columns_left else join_columns or []
-        self.join_columns_right: list[str] = join_columns_right if join_columns_right else join_columns or []
+        self.join_columns_left: list[str] = join_columns_left or join_columns or []
+        self.join_columns_right: list[str] = join_columns_right or join_columns or []
 
         if not self.join_columns_right or not self.join_columns_left:
             msg = "No join_columns was provided. Use join_columns, join_columns_left, and/or join_columns_right"
