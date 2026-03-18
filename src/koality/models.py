@@ -111,6 +111,7 @@ class DatabaseProvider:
     readonly: bool
     encrypted: bool
     cipher: str | None
+    options: str | None = None
 
 
 type CHECK_TYPE = Literal[
