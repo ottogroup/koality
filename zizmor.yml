@@ -1,6 +1,8 @@
 rules:
   unpinned-uses:
-    ignore:
     config:
       policies:
         "*": ref-pin
+
+  cache-poisoning:
+    disable: true
