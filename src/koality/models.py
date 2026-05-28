@@ -5,7 +5,7 @@ from dataclasses import dataclass
 from datetime import datetime
 from typing import Annotated, Literal, Self
 
-from pydantic import BaseModel, Field, computed_field, confloat, conint, model_validator
+from pydantic import BaseModel, Field, computed_field, model_validator
 
 # Supported SQL comparison operators
 FilterOperator = Literal["=", "!=", "<", ">", "<=", ">=", "IN", "NOT IN", "LIKE", "NOT LIKE"]
@@ -193,6 +193,8 @@ class _GlobalDefaults(_Defaults):
 class _Check(_LocalDefaults):
     """Base model for all check configurations."""
 
+    check_type: CHECK_TYPE
+
     @model_validator(mode="after")
     def validate_filters_have_columns(self) -> Self:
         """Validate that all filters with concrete values have columns specified.
@@ -321,15 +323,15 @@ class _MatchRateCheck(_Check):
 class _RelCountChangeCheck(_SingleTableCheck):
     """Config model for RelCountChangeCheck."""
 
-    rolling_days: conint(ge=1)
+    rolling_days: int = Field(ge=1)
 
 
 class _IqrOutlierCheck(_SingleTableCheck):
     """Config model for IqrOutlierCheck."""
 
-    interval_days: conint(ge=1)
+    interval_days: int = Field(ge=1)
     how: Literal["both", "upper", "lower"]
-    iqr_factor: confloat(gt=0)
+    iqr_factor: float = Field(gt=0)
 
 
 class _CheckBundle(BaseModel):

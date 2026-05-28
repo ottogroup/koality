@@ -4,6 +4,7 @@ import datetime as dt
 import logging
 from collections import defaultdict
 from pathlib import Path
+from typing import Any
 
 import duckdb
 from tqdm import tqdm
@@ -255,8 +256,9 @@ class CheckExecutor:
                     data_requirements[table_name]["columns"].add(_filter["column"])
 
             # Ensure date column is included in the requirements when the check provides a date_filter
-            if getattr(check, "date_filter", None):
-                date_col = check.date_filter.get("column")
+            date_filter: dict[str, Any] | None = getattr(check, "date_filter", None)
+            if date_filter:
+                date_col = date_filter.get("column")
                 if date_col:
                     data_requirements[table_name]["columns"].add(date_col)
 
@@ -269,9 +271,10 @@ class CheckExecutor:
 
             # For rolling-style checks we also need to ensure historic date ranges are fetched.
             # Add an explicit BETWEEN-style filter group so fetch_data_into_memory can restrict rows.
-            if getattr(check, "date_filter", None):
-                date_col = check.date_filter.get("column")
-                date_val = check.date_filter.get("value")
+            date_filter: dict[str, Any] | None = getattr(check, "date_filter", None)
+            if date_filter:
+                date_col = date_filter.get("column")
+                date_val = date_filter.get("value")
                 if date_col and date_val is not None:
                     # Default window size for rolling checks
                     if isinstance(check, RelCountChangeCheck):
@@ -659,7 +662,7 @@ class CheckExecutor:
         for row in results_with_it:
             row["INSERT_TIMESTAMP"] = now
 
-        if self.config.database_accessor:
+        if self.config.database_accessor and (self.database_provider and self.database_provider.type):
             query_create_or_replace_table = f"""
                 CREATE TABLE IF NOT EXISTS {self.result_table} (
                     DATE {DATA_TYPES["DATE"][self.database_provider.type]},

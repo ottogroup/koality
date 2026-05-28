@@ -22,6 +22,7 @@ from typing import Any
 import click
 import yaml
 from pydantic import ValidationError
+from yaml.nodes import ScalarNode
 
 from koality.executor import CheckExecutor
 from koality.models import Config
@@ -619,14 +620,14 @@ class _LiteralBlockDumper(yaml.SafeDumper):
     """Custom YAML dumper that uses literal block style for multiline strings."""
 
 
-def _literal_str_representer(dumper: yaml.Dumper, data: str) -> yaml.ScalarNode:
+def _literal_str_representer(dumper: yaml.Dumper, data: str) -> ScalarNode:
     """Represent multiline strings using literal block style (|)."""
     if "\n" in data:
         return dumper.represent_scalar("tag:yaml.org,2002:str", data, style="|")
     return dumper.represent_scalar("tag:yaml.org,2002:str", data)
 
 
-_LiteralBlockDumper.add_representer(str, _literal_str_representer)
+_LiteralBlockDumper.add_representer(str, _literal_str_representer)  # ty:ignore[invalid-argument-type]
 
 
 def _dump_yaml(data: dict, *, indent: int = 2) -> str:
