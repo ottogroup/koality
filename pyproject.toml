@@ -120,6 +120,7 @@ lint = [
     { cmd = "ruff format --check" },
     { cmd = "ruff check" },
 ]
+type = "ty check src/koality"
 # Security and dependency checks.
 check_vulnerable_dependencies = "pysentry-rs --sources pypa,osv,pypi"
 check_unused_dependencies = "deptry src/koality"

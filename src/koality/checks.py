@@ -878,6 +878,10 @@ class RollingValuesInSetCheck(ValuesInSetCheck):
     def assemble_query(self) -> str:
         """Assemble query with rolling date range for values in set check."""
         main_query = self.query_boilerplate(self.transformation_statement())
+        if not self.date_filter:
+            msg = "RollingValuesInSetCheck requires a filter with type='date'"
+            raise KoalityError(msg)
+
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
@@ -1550,6 +1554,10 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
             "WHERE",
             "AND",
         )
+        if not self.date_filter:
+            msg = "RelCountChangeCheck requires a filter with type='date'"
+            raise KoalityError(msg)
+
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
@@ -1611,6 +1619,10 @@ class RelCountChangeCheck(DataQualityCheck):  # TODO: (non)distinct counts param
         FROM
             "{self.table}"
         """
+        if not self.date_filter:
+            msg = "RelCountChangeCheck requires a filter with type='date'"
+            raise KoalityError(msg)
+
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
@@ -1726,6 +1738,10 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         #       IQR calculation
         where_statement = ""
         filter_columns = ""
+        if not self.date_filter:
+            msg = "IqrOutlierCheck requires a date filter for the IQR calculation."
+            raise KoalityError(msg)
+
         date_col = self.date_filter["column"]
         date_val = self.date_filter["value"]
 
@@ -1806,14 +1822,14 @@ class IqrOutlierCheck(ColumnTransformationCheck):
         FROM
             "{self.table}"
         """
-        date_col = self.date_filter["column"]
-        date_val = self.date_filter["value"]
-
         filters = {k: v for k, v in self.filters.items() if v["type"] != "date"}
 
         where_statement = self.assemble_where_statement(filters, database_accessor=self.database_accessor)
-        if where_statement:
-            where_statement = f"{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
-        else:
-            where_statement = f"WHERE CAST({date_col} AS DATE) = DATE '{date_val}'"
+        if self.date_filter:
+            date_col = self.date_filter["column"]
+            date_val = self.date_filter["value"]
+            if where_statement:
+                where_statement = f"{where_statement} AND CAST({date_col} AS DATE) = DATE '{date_val}'"
+            else:
+                where_statement = f"WHERE CAST({date_col} AS DATE) = DATE '{date_val}'"
         return f"{data_exists_query}\n{where_statement}"

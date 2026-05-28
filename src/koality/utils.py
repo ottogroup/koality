@@ -7,6 +7,7 @@ import re
 from ast import literal_eval
 from collections.abc import Iterable
 from logging import getLogger
+from typing import Any
 
 import duckdb
 
@@ -112,7 +113,7 @@ def parse_date(date: str) -> str:
     return dt.datetime.fromisoformat(date).date().isoformat()
 
 
-def to_set(value: object) -> set[object]:
+def to_set(value: object) -> set[Any]:
     """Convert the input value to a set.
 
     The special case of one single string is also covered. Duplicates are also
@@ -128,8 +129,9 @@ def to_set(value: object) -> set[object]:
     - {"toys"} -> {"toys"}
 
     """
-    with contextlib.suppress(ValueError):
-        value = literal_eval(value)
+    if isinstance(value, str):
+        with contextlib.suppress(ValueError):
+            value = literal_eval(value)
     if not isinstance(value, Iterable) or isinstance(value, (str, bytes)):
         return {value}
     if isinstance(value, set):
