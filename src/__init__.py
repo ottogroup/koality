@@ -1,1 +1,0 @@
-"""Koality source package."""
