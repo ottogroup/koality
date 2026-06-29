@@ -102,12 +102,12 @@ class CheckExecutor:
         self,
         config: Config,
         duckdb_client: duckdb.DuckDBPyConnection | None = None,
-        verbose: bool = False,  # noqa: FBT001, FBT002
+        verbose: bool | None = None,  # noqa: FBT001
         **kwargs: object,
     ) -> None:
         """Initialize the check executor with configuration and optional DuckDB client."""
-        self.verbose = verbose
-        if verbose:
+        self.verbose = config.defaults.verbose if verbose is None else verbose
+        if self.verbose:
             log.setLevel(logging.DEBUG)
         self.config = config
         if duckdb_client is not None:

@@ -69,14 +69,14 @@ def cli() -> None:
     "--verbose",
     "-v",
     is_flag=True,
-    default=False,
+    default=None,
     help="Enable verbose output, printing each check's SQL query before execution.",
 )
 def run(
     config_path: Path,
     overwrites: tuple[str, ...],
     database_setup_variable: tuple[str, ...],
-    verbose: bool,  # noqa: FBT001
+    verbose: bool | None,  # noqa: FBT001
 ) -> None:
     """Run koality checks from a configuration file.
 
@@ -447,7 +447,7 @@ def _convert_value(field_name: str, value: str) -> str | bool | int | float:
 
     """
     # Boolean fields
-    if field_name in ("monitor_only", "fail_if_no_rows"):
+    if field_name in ("monitor_only", "fail_if_no_rows", "verbose"):
         return value.lower() in ("true", "1", "yes")
 
     # Try numeric conversion
