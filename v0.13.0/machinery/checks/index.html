@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../../assets/icon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -2418,11 +2418,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1038</span>
-<span class="normal">1039</span>
-<span class="normal">1040</span>
-<span class="normal">1041</span>
-<span class="normal">1042</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1042</span>
 <span class="normal">1043</span>
 <span class="normal">1044</span>
 <span class="normal">1045</span>
@@ -2459,7 +2455,11 @@
 <span class="normal">1076</span>
 <span class="normal">1077</span>
 <span class="normal">1078</span>
-<span class="normal">1079</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AverageCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">1079</span>
+<span class="normal">1080</span>
+<span class="normal">1081</span>
+<span class="normal">1082</span>
+<span class="normal">1083</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">AverageCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the average (AVG) of a numeric column for the filtered rows.</span>
 
 <span class="sd">    Inherits from ColumnTransformationCheck. Thresholds apply to the computed average.</span>
@@ -2533,11 +2533,7 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1044</span>
-<span class="normal">1045</span>
-<span class="normal">1046</span>
-<span class="normal">1047</span>
-<span class="normal">1048</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1048</span>
 <span class="normal">1049</span>
 <span class="normal">1050</span>
 <span class="normal">1051</span>
@@ -2564,7 +2560,11 @@
 <span class="normal">1072</span>
 <span class="normal">1073</span>
 <span class="normal">1074</span>
-<span class="normal">1075</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1075</span>
+<span class="normal">1076</span>
+<span class="normal">1077</span>
+<span class="normal">1078</span>
+<span class="normal">1079</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -2618,9 +2618,9 @@
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1077</span>
-<span class="normal">1078</span>
-<span class="normal">1079</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1081</span>
+<span class="normal">1082</span>
+<span class="normal">1083</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for computing the average.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;AVG(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">in_memory_column</span><span class="si">}</span><span class="s2">) AS </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -3353,11 +3353,7 @@ CountCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 954</span>
-<span class="normal"> 955</span>
-<span class="normal"> 956</span>
-<span class="normal"> 957</span>
-<span class="normal"> 958</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 958</span>
 <span class="normal"> 959</span>
 <span class="normal"> 960</span>
 <span class="normal"> 961</span>
@@ -3434,7 +3430,11 @@ CountCheck(
 <span class="normal">1032</span>
 <span class="normal">1033</span>
 <span class="normal">1034</span>
-<span class="normal">1035</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CountCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">1035</span>
+<span class="normal">1036</span>
+<span class="normal">1037</span>
+<span class="normal">1038</span>
+<span class="normal">1039</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">CountCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check the number of rows or distinct values of a specific column.</span>
 
 <span class="sd">    Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to</span>
@@ -3548,11 +3548,7 @@ CountCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 983</span>
-<span class="normal"> 984</span>
-<span class="normal"> 985</span>
-<span class="normal"> 986</span>
-<span class="normal"> 987</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 987</span>
 <span class="normal"> 988</span>
 <span class="normal"> 989</span>
 <span class="normal"> 990</span>
@@ -3586,7 +3582,11 @@ CountCheck(
 <span class="normal">1018</span>
 <span class="normal">1019</span>
 <span class="normal">1020</span>
-<span class="normal">1021</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1021</span>
+<span class="normal">1022</span>
+<span class="normal">1023</span>
+<span class="normal">1024</span>
+<span class="normal">1025</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -3647,12 +3647,12 @@ CountCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1030</span>
-<span class="normal">1031</span>
-<span class="normal">1032</span>
-<span class="normal">1033</span>
-<span class="normal">1034</span>
-<span class="normal">1035</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1034</span>
+<span class="normal">1035</span>
+<span class="normal">1036</span>
+<span class="normal">1037</span>
+<span class="normal">1038</span>
+<span class="normal">1039</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the check name, using &#39;row_&#39; prefix for wildcard columns.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">check_column</span> <span class="o">==</span> <span class="s2">&quot;*&quot;</span><span class="p">:</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;row_</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">transformation_name</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -3680,12 +3680,12 @@ CountCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1023</span>
-<span class="normal">1024</span>
-<span class="normal">1025</span>
-<span class="normal">1026</span>
-<span class="normal">1027</span>
-<span class="normal">1028</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1027</span>
+<span class="normal">1028</span>
+<span class="normal">1029</span>
+<span class="normal">1030</span>
+<span class="normal">1031</span>
+<span class="normal">1032</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for counting rows or distinct values.&quot;&quot;&quot;</span>
     <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">distinct</span><span class="p">:</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;COUNT(DISTINCT </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">in_memory_column</span><span class="si">}</span><span class="s2">) AS </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
@@ -6476,11 +6476,7 @@ DuplicateCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">895</span>
-<span class="normal">896</span>
-<span class="normal">897</span>
-<span class="normal">898</span>
-<span class="normal">899</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">899</span>
 <span class="normal">900</span>
 <span class="normal">901</span>
 <span class="normal">902</span>
@@ -6532,7 +6528,11 @@ DuplicateCheck(
 <span class="normal">948</span>
 <span class="normal">949</span>
 <span class="normal">950</span>
-<span class="normal">951</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DuplicateCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">951</span>
+<span class="normal">952</span>
+<span class="normal">953</span>
+<span class="normal">954</span>
+<span class="normal">955</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">DuplicateCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check the number of duplicates for a specific column.</span>
 
 <span class="sd">    Counts all rows minus distinct counts. Inherits from ColumnTransformationCheck.</span>
@@ -6621,11 +6621,7 @@ DuplicateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">916</span>
-<span class="normal">917</span>
-<span class="normal">918</span>
-<span class="normal">919</span>
-<span class="normal">920</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">920</span>
 <span class="normal">921</span>
 <span class="normal">922</span>
 <span class="normal">923</span>
@@ -6652,7 +6648,11 @@ DuplicateCheck(
 <span class="normal">944</span>
 <span class="normal">945</span>
 <span class="normal">946</span>
-<span class="normal">947</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">947</span>
+<span class="normal">948</span>
+<span class="normal">949</span>
+<span class="normal">950</span>
+<span class="normal">951</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -6706,9 +6706,9 @@ DuplicateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">949</span>
-<span class="normal">950</span>
-<span class="normal">951</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">953</span>
+<span class="normal">954</span>
+<span class="normal">955</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for counting duplicates.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;COUNT(*) - COUNT(DISTINCT </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">in_memory_column</span><span class="si">}</span><span class="s2">) AS </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -6854,19 +6854,7 @@ IqrOutlierCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1623</span>
-<span class="normal">1624</span>
-<span class="normal">1625</span>
-<span class="normal">1626</span>
-<span class="normal">1627</span>
-<span class="normal">1628</span>
-<span class="normal">1629</span>
-<span class="normal">1630</span>
-<span class="normal">1631</span>
-<span class="normal">1632</span>
-<span class="normal">1633</span>
-<span class="normal">1634</span>
-<span class="normal">1635</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1635</span>
 <span class="normal">1636</span>
 <span class="normal">1637</span>
 <span class="normal">1638</span>
@@ -7050,7 +7038,23 @@ IqrOutlierCheck(
 <span class="normal">1816</span>
 <span class="normal">1817</span>
 <span class="normal">1818</span>
-<span class="normal">1819</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">IqrOutlierCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">1819</span>
+<span class="normal">1820</span>
+<span class="normal">1821</span>
+<span class="normal">1822</span>
+<span class="normal">1823</span>
+<span class="normal">1824</span>
+<span class="normal">1825</span>
+<span class="normal">1826</span>
+<span class="normal">1827</span>
+<span class="normal">1828</span>
+<span class="normal">1829</span>
+<span class="normal">1830</span>
+<span class="normal">1831</span>
+<span class="normal">1832</span>
+<span class="normal">1833</span>
+<span class="normal">1834</span>
+<span class="normal">1835</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">IqrOutlierCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check if a column value is an outlier based on the interquartile range (IQR) method.</span>
 
 <span class="sd">    Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to</span>
@@ -7156,6 +7160,10 @@ IqrOutlierCheck(
         <span class="c1">#       IQR calculation</span>
         <span class="n">where_statement</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
         <span class="n">filter_columns</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;IqrOutlierCheck requires a date filter for the IQR calculation.&quot;</span>
+            <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
         <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
         <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -7236,16 +7244,16 @@ IqrOutlierCheck(
 <span class="s2">        FROM</span>
 <span class="s2">            &quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="s2">        &quot;&quot;&quot;</span>
-        <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
-        <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
-
         <span class="n">filters</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;date&quot;</span><span class="p">}</span>
 
         <span class="n">where_statement</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">assemble_where_statement</span><span class="p">(</span><span class="n">filters</span><span class="p">,</span> <span class="n">database_accessor</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">database_accessor</span><span class="p">)</span>
-        <span class="k">if</span> <span class="n">where_statement</span><span class="p">:</span>
-            <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">where_statement</span><span class="si">}</span><span class="s2"> AND CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;WHERE CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+        <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+            <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
+            <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+            <span class="k">if</span> <span class="n">where_statement</span><span class="p">:</span>
+                <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">where_statement</span><span class="si">}</span><span class="s2"> AND CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+            <span class="k">else</span><span class="p">:</span>
+                <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;WHERE CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
         <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_exists_query</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">where_statement</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
               </details>
@@ -7279,19 +7287,7 @@ IqrOutlierCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1661</span>
-<span class="normal">1662</span>
-<span class="normal">1663</span>
-<span class="normal">1664</span>
-<span class="normal">1665</span>
-<span class="normal">1666</span>
-<span class="normal">1667</span>
-<span class="normal">1668</span>
-<span class="normal">1669</span>
-<span class="normal">1670</span>
-<span class="normal">1671</span>
-<span class="normal">1672</span>
-<span class="normal">1673</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1673</span>
 <span class="normal">1674</span>
 <span class="normal">1675</span>
 <span class="normal">1676</span>
@@ -7338,7 +7334,19 @@ IqrOutlierCheck(
 <span class="normal">1717</span>
 <span class="normal">1718</span>
 <span class="normal">1719</span>
-<span class="normal">1720</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1720</span>
+<span class="normal">1721</span>
+<span class="normal">1722</span>
+<span class="normal">1723</span>
+<span class="normal">1724</span>
+<span class="normal">1725</span>
+<span class="normal">1726</span>
+<span class="normal">1727</span>
+<span class="normal">1728</span>
+<span class="normal">1729</span>
+<span class="normal">1730</span>
+<span class="normal">1731</span>
+<span class="normal">1732</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -7420,25 +7428,25 @@ IqrOutlierCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1801</span>
-<span class="normal">1802</span>
-<span class="normal">1803</span>
-<span class="normal">1804</span>
-<span class="normal">1805</span>
-<span class="normal">1806</span>
-<span class="normal">1807</span>
-<span class="normal">1808</span>
-<span class="normal">1809</span>
-<span class="normal">1810</span>
-<span class="normal">1811</span>
-<span class="normal">1812</span>
-<span class="normal">1813</span>
-<span class="normal">1814</span>
-<span class="normal">1815</span>
-<span class="normal">1816</span>
-<span class="normal">1817</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1817</span>
 <span class="normal">1818</span>
-<span class="normal">1819</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_data_exists_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1819</span>
+<span class="normal">1820</span>
+<span class="normal">1821</span>
+<span class="normal">1822</span>
+<span class="normal">1823</span>
+<span class="normal">1824</span>
+<span class="normal">1825</span>
+<span class="normal">1826</span>
+<span class="normal">1827</span>
+<span class="normal">1828</span>
+<span class="normal">1829</span>
+<span class="normal">1830</span>
+<span class="normal">1831</span>
+<span class="normal">1832</span>
+<span class="normal">1833</span>
+<span class="normal">1834</span>
+<span class="normal">1835</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_data_exists_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assemble the query to check if data exists for IQR outlier detection.&quot;&quot;&quot;</span>
     <span class="n">data_exists_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    SELECT</span>
@@ -7446,16 +7454,16 @@ IqrOutlierCheck(
 <span class="s2">    FROM</span>
 <span class="s2">        &quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="s2">    &quot;&quot;&quot;</span>
-    <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
-    <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
-
     <span class="n">filters</span> <span class="o">=</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="n">v</span> <span class="k">for</span> <span class="n">k</span><span class="p">,</span> <span class="n">v</span> <span class="ow">in</span> <span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="o">.</span><span class="n">items</span><span class="p">()</span> <span class="k">if</span> <span class="n">v</span><span class="p">[</span><span class="s2">&quot;type&quot;</span><span class="p">]</span> <span class="o">!=</span> <span class="s2">&quot;date&quot;</span><span class="p">}</span>
 
     <span class="n">where_statement</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">assemble_where_statement</span><span class="p">(</span><span class="n">filters</span><span class="p">,</span> <span class="n">database_accessor</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">database_accessor</span><span class="p">)</span>
-    <span class="k">if</span> <span class="n">where_statement</span><span class="p">:</span>
-        <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">where_statement</span><span class="si">}</span><span class="s2"> AND CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
-    <span class="k">else</span><span class="p">:</span>
-        <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;WHERE CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+    <span class="k">if</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+        <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
+        <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">where_statement</span><span class="p">:</span>
+            <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">where_statement</span><span class="si">}</span><span class="s2"> AND CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">where_statement</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;WHERE CAST(</span><span class="si">{</span><span class="n">date_col</span><span class="si">}</span><span class="s2"> AS DATE) = DATE &#39;</span><span class="si">{</span><span class="n">date_val</span><span class="si">}</span><span class="s2">&#39;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="n">data_exists_query</span><span class="si">}</span><span class="se">\n</span><span class="si">{</span><span class="n">where_statement</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -7479,16 +7487,16 @@ IqrOutlierCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1779</span>
-<span class="normal">1780</span>
-<span class="normal">1781</span>
-<span class="normal">1782</span>
-<span class="normal">1783</span>
-<span class="normal">1784</span>
-<span class="normal">1785</span>
-<span class="normal">1786</span>
-<span class="normal">1787</span>
-<span class="normal">1788</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query_boilerplate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metric_statement</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1795</span>
+<span class="normal">1796</span>
+<span class="normal">1797</span>
+<span class="normal">1798</span>
+<span class="normal">1799</span>
+<span class="normal">1800</span>
+<span class="normal">1801</span>
+<span class="normal">1802</span>
+<span class="normal">1803</span>
+<span class="normal">1804</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">query_boilerplate</span><span class="p">(</span><span class="bp">self</span><span class="p">,</span> <span class="n">metric_statement</span><span class="p">:</span> <span class="nb">str</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the query structure for IQR outlier detection.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">        </span><span class="si">{</span><span class="n">metric_statement</span><span class="si">}</span>
@@ -7520,19 +7528,7 @@ IqrOutlierCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1722</span>
-<span class="normal">1723</span>
-<span class="normal">1724</span>
-<span class="normal">1725</span>
-<span class="normal">1726</span>
-<span class="normal">1727</span>
-<span class="normal">1728</span>
-<span class="normal">1729</span>
-<span class="normal">1730</span>
-<span class="normal">1731</span>
-<span class="normal">1732</span>
-<span class="normal">1733</span>
-<span class="normal">1734</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1734</span>
 <span class="normal">1735</span>
 <span class="normal">1736</span>
 <span class="normal">1737</span>
@@ -7575,13 +7571,33 @@ IqrOutlierCheck(
 <span class="normal">1774</span>
 <span class="normal">1775</span>
 <span class="normal">1776</span>
-<span class="normal">1777</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1777</span>
+<span class="normal">1778</span>
+<span class="normal">1779</span>
+<span class="normal">1780</span>
+<span class="normal">1781</span>
+<span class="normal">1782</span>
+<span class="normal">1783</span>
+<span class="normal">1784</span>
+<span class="normal">1785</span>
+<span class="normal">1786</span>
+<span class="normal">1787</span>
+<span class="normal">1788</span>
+<span class="normal">1789</span>
+<span class="normal">1790</span>
+<span class="normal">1791</span>
+<span class="normal">1792</span>
+<span class="normal">1793</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for IQR-based outlier detection.&quot;&quot;&quot;</span>
     <span class="c1"># TODO: currently we only raise an error if there is no data for the date</span>
     <span class="c1">#       we could also raise an error if there is not enough data for the</span>
     <span class="c1">#       IQR calculation</span>
     <span class="n">where_statement</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
     <span class="n">filter_columns</span> <span class="o">=</span> <span class="s2">&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;IqrOutlierCheck requires a date filter for the IQR calculation.&quot;</span>
+        <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
     <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
     <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -7874,11 +7890,7 @@ MatchRateCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1255</span>
-<span class="normal">1256</span>
-<span class="normal">1257</span>
-<span class="normal">1258</span>
-<span class="normal">1259</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1259</span>
 <span class="normal">1260</span>
 <span class="normal">1261</span>
 <span class="normal">1262</span>
@@ -8074,7 +8086,11 @@ MatchRateCheck(
 <span class="normal">1452</span>
 <span class="normal">1453</span>
 <span class="normal">1454</span>
-<span class="normal">1455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MatchRateCheck</span><span class="p">(</span><span class="n">DataQualityCheck</span><span class="p">):</span>
+<span class="normal">1455</span>
+<span class="normal">1456</span>
+<span class="normal">1457</span>
+<span class="normal">1458</span>
+<span class="normal">1459</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MatchRateCheck</span><span class="p">(</span><span class="n">DataQualityCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Checks the match rate between two tables after joining on specific columns.</span>
 
 <span class="sd">    If left_join_columns (or right_join_columns) is defined, these columns will be</span>
@@ -8307,11 +8323,7 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1300</span>
-<span class="normal">1301</span>
-<span class="normal">1302</span>
-<span class="normal">1303</span>
-<span class="normal">1304</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1304</span>
 <span class="normal">1305</span>
 <span class="normal">1306</span>
 <span class="normal">1307</span>
@@ -8370,7 +8382,11 @@ MatchRateCheck(
 <span class="normal">1360</span>
 <span class="normal">1361</span>
 <span class="normal">1362</span>
-<span class="normal">1363</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1363</span>
+<span class="normal">1364</span>
+<span class="normal">1365</span>
+<span class="normal">1366</span>
+<span class="normal">1367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -8479,11 +8495,7 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1424</span>
-<span class="normal">1425</span>
-<span class="normal">1426</span>
-<span class="normal">1427</span>
-<span class="normal">1428</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1428</span>
 <span class="normal">1429</span>
 <span class="normal">1430</span>
 <span class="normal">1431</span>
@@ -8510,7 +8522,11 @@ MatchRateCheck(
 <span class="normal">1452</span>
 <span class="normal">1453</span>
 <span class="normal">1454</span>
-<span class="normal">1455</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_data_exists_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1455</span>
+<span class="normal">1456</span>
+<span class="normal">1457</span>
+<span class="normal">1458</span>
+<span class="normal">1459</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_data_exists_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;First checks left, then right table for data.</span>
 
 <span class="sd">    Returns:</span>
@@ -8564,9 +8580,9 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1365</span>
-<span class="normal">1366</span>
-<span class="normal">1367</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1369</span>
+<span class="normal">1370</span>
+<span class="normal">1371</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the check name for match rate.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">check_column</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">_matchrate&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -8591,11 +8607,7 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1369</span>
-<span class="normal">1370</span>
-<span class="normal">1371</span>
-<span class="normal">1372</span>
-<span class="normal">1373</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1373</span>
 <span class="normal">1374</span>
 <span class="normal">1375</span>
 <span class="normal">1376</span>
@@ -8644,7 +8656,11 @@ MatchRateCheck(
 <span class="normal">1419</span>
 <span class="normal">1420</span>
 <span class="normal">1421</span>
-<span class="normal">1422</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1422</span>
+<span class="normal">1423</span>
+<span class="normal">1424</span>
+<span class="normal">1425</span>
+<span class="normal">1426</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assemble the SQL query for calculating match rate between tables.&quot;&quot;&quot;</span>
     <span class="c1"># Transform dotted column names based on data source:</span>
     <span class="c1"># - With database_accessor: convert to underscores (value.shopId → value_shopId) for flattened data</span>
@@ -8741,11 +8757,7 @@ MatchRateCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1082</span>
-<span class="normal">1083</span>
-<span class="normal">1084</span>
-<span class="normal">1085</span>
-<span class="normal">1086</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1086</span>
 <span class="normal">1087</span>
 <span class="normal">1088</span>
 <span class="normal">1089</span>
@@ -8782,7 +8794,11 @@ MatchRateCheck(
 <span class="normal">1120</span>
 <span class="normal">1121</span>
 <span class="normal">1122</span>
-<span class="normal">1123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MaxCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">1123</span>
+<span class="normal">1124</span>
+<span class="normal">1125</span>
+<span class="normal">1126</span>
+<span class="normal">1127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MaxCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the maximum (MAX) of a column for the filtered rows.</span>
 
 <span class="sd">    Inherits from ColumnTransformationCheck. Thresholds apply to the computed maximum.</span>
@@ -8856,11 +8872,7 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1088</span>
-<span class="normal">1089</span>
-<span class="normal">1090</span>
-<span class="normal">1091</span>
-<span class="normal">1092</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1092</span>
 <span class="normal">1093</span>
 <span class="normal">1094</span>
 <span class="normal">1095</span>
@@ -8887,7 +8899,11 @@ MatchRateCheck(
 <span class="normal">1116</span>
 <span class="normal">1117</span>
 <span class="normal">1118</span>
-<span class="normal">1119</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1119</span>
+<span class="normal">1120</span>
+<span class="normal">1121</span>
+<span class="normal">1122</span>
+<span class="normal">1123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -8941,9 +8957,9 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1121</span>
-<span class="normal">1122</span>
-<span class="normal">1123</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1125</span>
+<span class="normal">1126</span>
+<span class="normal">1127</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for computing the maximum.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;MAX(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">in_memory_column</span><span class="si">}</span><span class="s2">) AS </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -8989,11 +9005,7 @@ MatchRateCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1126</span>
-<span class="normal">1127</span>
-<span class="normal">1128</span>
-<span class="normal">1129</span>
-<span class="normal">1130</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1130</span>
 <span class="normal">1131</span>
 <span class="normal">1132</span>
 <span class="normal">1133</span>
@@ -9030,7 +9042,11 @@ MatchRateCheck(
 <span class="normal">1164</span>
 <span class="normal">1165</span>
 <span class="normal">1166</span>
-<span class="normal">1167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MinCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">1167</span>
+<span class="normal">1168</span>
+<span class="normal">1169</span>
+<span class="normal">1170</span>
+<span class="normal">1171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">MinCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Compute the minimum (MIN) of a column for the filtered rows.</span>
 
 <span class="sd">    Inherits from ColumnTransformationCheck. Thresholds apply to the computed minimum.</span>
@@ -9104,11 +9120,7 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1132</span>
-<span class="normal">1133</span>
-<span class="normal">1134</span>
-<span class="normal">1135</span>
-<span class="normal">1136</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1136</span>
 <span class="normal">1137</span>
 <span class="normal">1138</span>
 <span class="normal">1139</span>
@@ -9135,7 +9147,11 @@ MatchRateCheck(
 <span class="normal">1160</span>
 <span class="normal">1161</span>
 <span class="normal">1162</span>
-<span class="normal">1163</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1163</span>
+<span class="normal">1164</span>
+<span class="normal">1165</span>
+<span class="normal">1166</span>
+<span class="normal">1167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -9189,9 +9205,9 @@ MatchRateCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1165</span>
-<span class="normal">1166</span>
-<span class="normal">1167</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1169</span>
+<span class="normal">1170</span>
+<span class="normal">1171</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for computing the minimum.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;MIN(</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">in_memory_column</span><span class="si">}</span><span class="s2">) AS </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -9597,11 +9613,7 @@ OccurrenceCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1170</span>
-<span class="normal">1171</span>
-<span class="normal">1172</span>
-<span class="normal">1173</span>
-<span class="normal">1174</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1174</span>
 <span class="normal">1175</span>
 <span class="normal">1176</span>
 <span class="normal">1177</span>
@@ -9679,7 +9691,11 @@ OccurrenceCheck(
 <span class="normal">1249</span>
 <span class="normal">1250</span>
 <span class="normal">1251</span>
-<span class="normal">1252</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OccurrenceCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
+<span class="normal">1252</span>
+<span class="normal">1253</span>
+<span class="normal">1254</span>
+<span class="normal">1255</span>
+<span class="normal">1256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">OccurrenceCheck</span><span class="p">(</span><span class="n">ColumnTransformationCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check how often any value in a column occurs.</span>
 
 <span class="sd">    Inherits from `koality.checks.ColumnTransformationCheck`, and thus, we refer to argument</span>
@@ -9794,11 +9810,7 @@ OccurrenceCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1199</span>
-<span class="normal">1200</span>
-<span class="normal">1201</span>
-<span class="normal">1202</span>
-<span class="normal">1203</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1203</span>
 <span class="normal">1204</span>
 <span class="normal">1205</span>
 <span class="normal">1206</span>
@@ -9830,7 +9842,11 @@ OccurrenceCheck(
 <span class="normal">1232</span>
 <span class="normal">1233</span>
 <span class="normal">1234</span>
-<span class="normal">1235</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1235</span>
+<span class="normal">1236</span>
+<span class="normal">1237</span>
+<span class="normal">1238</span>
+<span class="normal">1239</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -9889,18 +9905,18 @@ OccurrenceCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1241</span>
-<span class="normal">1242</span>
-<span class="normal">1243</span>
-<span class="normal">1244</span>
-<span class="normal">1245</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1245</span>
 <span class="normal">1246</span>
 <span class="normal">1247</span>
 <span class="normal">1248</span>
 <span class="normal">1249</span>
 <span class="normal">1250</span>
 <span class="normal">1251</span>
-<span class="normal">1252</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1252</span>
+<span class="normal">1253</span>
+<span class="normal">1254</span>
+<span class="normal">1255</span>
+<span class="normal">1256</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assemble query to find max or min occurrence of any value.&quot;&quot;&quot;</span>
     <span class="c1"># Since koality checks only the first entry, the table with value + count_occurence is</span>
     <span class="c1"># ordered DESC/ASC depending on whether max/min occurence is supposed to be checked.</span>
@@ -9934,9 +9950,9 @@ OccurrenceCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1237</span>
-<span class="normal">1238</span>
-<span class="normal">1239</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1241</span>
+<span class="normal">1242</span>
+<span class="normal">1243</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">transformation_statement</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the SQL statement for counting occurrences.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">in_memory_column</span><span class="si">}</span><span class="s2">, COUNT(*) AS </span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">name</span><span class="si">}</span><span class="s2">&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -10478,11 +10494,7 @@ RelCountChangeCheck(
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/checks.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1458</span>
-<span class="normal">1459</span>
-<span class="normal">1460</span>
-<span class="normal">1461</span>
-<span class="normal">1462</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1462</span>
 <span class="normal">1463</span>
 <span class="normal">1464</span>
 <span class="normal">1465</span>
@@ -10640,7 +10652,19 @@ RelCountChangeCheck(
 <span class="normal">1617</span>
 <span class="normal">1618</span>
 <span class="normal">1619</span>
-<span class="normal">1620</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RelCountChangeCheck</span><span class="p">(</span><span class="n">DataQualityCheck</span><span class="p">):</span>  <span class="c1"># TODO: (non)distinct counts parameter?</span>
+<span class="normal">1620</span>
+<span class="normal">1621</span>
+<span class="normal">1622</span>
+<span class="normal">1623</span>
+<span class="normal">1624</span>
+<span class="normal">1625</span>
+<span class="normal">1626</span>
+<span class="normal">1627</span>
+<span class="normal">1628</span>
+<span class="normal">1629</span>
+<span class="normal">1630</span>
+<span class="normal">1631</span>
+<span class="normal">1632</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RelCountChangeCheck</span><span class="p">(</span><span class="n">DataQualityCheck</span><span class="p">):</span>  <span class="c1"># TODO: (non)distinct counts parameter?</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check the relative change of a count compared to historic average.</span>
 
 <span class="sd">    Compares the count to the average counts of a number of historic days before</span>
@@ -10735,6 +10759,10 @@ RelCountChangeCheck(
             <span class="s2">&quot;WHERE&quot;</span><span class="p">,</span>
             <span class="s2">&quot;AND&quot;</span><span class="p">,</span>
         <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;RelCountChangeCheck requires a filter with type=&#39;date&#39;&quot;</span>
+            <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
         <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
         <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -10796,6 +10824,10 @@ RelCountChangeCheck(
 <span class="s2">        FROM</span>
 <span class="s2">            &quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="s2">        &quot;&quot;&quot;</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;RelCountChangeCheck requires a filter with type=&#39;date&#39;&quot;</span>
+            <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
         <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
         <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -10835,11 +10867,7 @@ RelCountChangeCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1492</span>
-<span class="normal">1493</span>
-<span class="normal">1494</span>
-<span class="normal">1495</span>
-<span class="normal">1496</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1496</span>
 <span class="normal">1497</span>
 <span class="normal">1498</span>
 <span class="normal">1499</span>
@@ -10884,7 +10912,11 @@ RelCountChangeCheck(
 <span class="normal">1538</span>
 <span class="normal">1539</span>
 <span class="normal">1540</span>
-<span class="normal">1541</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
+<span class="normal">1541</span>
+<span class="normal">1542</span>
+<span class="normal">1543</span>
+<span class="normal">1544</span>
+<span class="normal">1545</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="fm">__init__</span><span class="p">(</span>
     <span class="bp">self</span><span class="p">,</span>
     <span class="n">database_accessor</span><span class="p">:</span> <span class="nb">str</span><span class="p">,</span>
     <span class="n">database_provider</span><span class="p">:</span> <span class="n">DatabaseProvider</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>
@@ -10956,21 +10988,25 @@ RelCountChangeCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1606</span>
-<span class="normal">1607</span>
-<span class="normal">1608</span>
-<span class="normal">1609</span>
-<span class="normal">1610</span>
-<span class="normal">1611</span>
-<span class="normal">1612</span>
-<span class="normal">1613</span>
-<span class="normal">1614</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1614</span>
 <span class="normal">1615</span>
 <span class="normal">1616</span>
 <span class="normal">1617</span>
 <span class="normal">1618</span>
 <span class="normal">1619</span>
-<span class="normal">1620</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_data_exists_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1620</span>
+<span class="normal">1621</span>
+<span class="normal">1622</span>
+<span class="normal">1623</span>
+<span class="normal">1624</span>
+<span class="normal">1625</span>
+<span class="normal">1626</span>
+<span class="normal">1627</span>
+<span class="normal">1628</span>
+<span class="normal">1629</span>
+<span class="normal">1630</span>
+<span class="normal">1631</span>
+<span class="normal">1632</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_data_exists_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assemble the SQL query to check if data exists for the check date.&quot;&quot;&quot;</span>
     <span class="n">data_exists_query</span> <span class="o">=</span> <span class="sa">f</span><span class="s2">&quot;&quot;&quot;</span>
 <span class="s2">    SELECT</span>
@@ -10978,6 +11014,10 @@ RelCountChangeCheck(
 <span class="s2">    FROM</span>
 <span class="s2">        &quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">table</span><span class="si">}</span><span class="s2">&quot;</span>
 <span class="s2">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;RelCountChangeCheck requires a filter with type=&#39;date&#39;&quot;</span>
+        <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
     <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
     <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -11007,9 +11047,9 @@ RelCountChangeCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1543</span>
-<span class="normal">1544</span>
-<span class="normal">1545</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1547</span>
+<span class="normal">1548</span>
+<span class="normal">1549</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_name</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Return the check name for count change.&quot;&quot;&quot;</span>
     <span class="k">return</span> <span class="sa">f</span><span class="s2">&quot;</span><span class="si">{</span><span class="bp">self</span><span class="o">.</span><span class="n">check_column</span><span class="o">.</span><span class="n">split</span><span class="p">(</span><span class="s1">&#39;.&#39;</span><span class="p">)[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span><span class="si">}</span><span class="s2">_count_change&quot;</span>
 </code></pre></div></td></tr></table></div>
@@ -11034,11 +11074,7 @@ RelCountChangeCheck(
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/checks.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1547</span>
-<span class="normal">1548</span>
-<span class="normal">1549</span>
-<span class="normal">1550</span>
-<span class="normal">1551</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">1551</span>
 <span class="normal">1552</span>
 <span class="normal">1553</span>
 <span class="normal">1554</span>
@@ -11091,12 +11127,24 @@ RelCountChangeCheck(
 <span class="normal">1601</span>
 <span class="normal">1602</span>
 <span class="normal">1603</span>
-<span class="normal">1604</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">1604</span>
+<span class="normal">1605</span>
+<span class="normal">1606</span>
+<span class="normal">1607</span>
+<span class="normal">1608</span>
+<span class="normal">1609</span>
+<span class="normal">1610</span>
+<span class="normal">1611</span>
+<span class="normal">1612</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assemble the SQL query for calculating relative count change.&quot;&quot;&quot;</span>
     <span class="n">where_statement</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">assemble_where_statement</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">filters</span><span class="p">,</span> <span class="n">database_accessor</span><span class="o">=</span><span class="bp">self</span><span class="o">.</span><span class="n">database_accessor</span><span class="p">)</span><span class="o">.</span><span class="n">replace</span><span class="p">(</span>
         <span class="s2">&quot;WHERE&quot;</span><span class="p">,</span>
         <span class="s2">&quot;AND&quot;</span><span class="p">,</span>
     <span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;RelCountChangeCheck requires a filter with type=&#39;date&#39;&quot;</span>
+        <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
     <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
     <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -11335,7 +11383,11 @@ RollingValuesInSetCheck(
 <span class="normal">889</span>
 <span class="normal">890</span>
 <span class="normal">891</span>
-<span class="normal">892</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RollingValuesInSetCheck</span><span class="p">(</span><span class="n">ValuesInSetCheck</span><span class="p">):</span>
+<span class="normal">892</span>
+<span class="normal">893</span>
+<span class="normal">894</span>
+<span class="normal">895</span>
+<span class="normal">896</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">RollingValuesInSetCheck</span><span class="p">(</span><span class="n">ValuesInSetCheck</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Check share of values matching a value set over a rolling time period.</span>
 
 <span class="sd">    Similar to `ValuesInSetCheck`, but the share is computed for a longer time period</span>
@@ -11418,6 +11470,10 @@ RollingValuesInSetCheck(
     <span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">        </span><span class="sd">&quot;&quot;&quot;Assemble query with rolling date range for values in set check.&quot;&quot;&quot;</span>
         <span class="n">main_query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">query_boilerplate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transformation_statement</span><span class="p">())</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+            <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;RollingValuesInSetCheck requires a filter with type=&#39;date&#39;&quot;</span>
+            <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
         <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
         <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 
@@ -11597,9 +11653,17 @@ RollingValuesInSetCheck(
 <span class="normal">889</span>
 <span class="normal">890</span>
 <span class="normal">891</span>
-<span class="normal">892</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
+<span class="normal">892</span>
+<span class="normal">893</span>
+<span class="normal">894</span>
+<span class="normal">895</span>
+<span class="normal">896</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">def</span><span class="w"> </span><span class="nf">assemble_query</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">str</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Assemble query with rolling date range for values in set check.&quot;&quot;&quot;</span>
     <span class="n">main_query</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">query_boilerplate</span><span class="p">(</span><span class="bp">self</span><span class="o">.</span><span class="n">transformation_statement</span><span class="p">())</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">:</span>
+        <span class="n">msg</span> <span class="o">=</span> <span class="s2">&quot;RollingValuesInSetCheck requires a filter with type=&#39;date&#39;&quot;</span>
+        <span class="k">raise</span> <span class="n">KoalityError</span><span class="p">(</span><span class="n">msg</span><span class="p">)</span>
+
     <span class="n">date_col</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;column&quot;</span><span class="p">]</span>
     <span class="n">date_val</span> <span class="o">=</span> <span class="bp">self</span><span class="o">.</span><span class="n">date_filter</span><span class="p">[</span><span class="s2">&quot;value&quot;</span><span class="p">]</span>
 

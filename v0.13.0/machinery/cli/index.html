@@ -17,7 +17,7 @@
       
       
       <link rel="icon" href="../../assets/icon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -812,13 +812,13 @@ check configurations. Use --help on any command for more details.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/cli.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">33</span>
-<span class="normal">34</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">34</span>
 <span class="normal">35</span>
 <span class="normal">36</span>
 <span class="normal">37</span>
 <span class="normal">38</span>
-<span class="normal">39</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@click</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
+<span class="normal">39</span>
+<span class="normal">40</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@click</span><span class="o">.</span><span class="n">group</span><span class="p">()</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">cli</span><span class="p">()</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Koality - Data quality monitoring CLI.</span>
 
@@ -872,16 +872,7 @@ json: JSON formatted output.
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/cli.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">523</span>
-<span class="normal">524</span>
-<span class="normal">525</span>
-<span class="normal">526</span>
-<span class="normal">527</span>
-<span class="normal">528</span>
-<span class="normal">529</span>
-<span class="normal">530</span>
-<span class="normal">531</span>
-<span class="normal">532</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">532</span>
 <span class="normal">533</span>
 <span class="normal">534</span>
 <span class="normal">535</span>
@@ -964,7 +955,16 @@ json: JSON formatted output.
 <span class="normal">612</span>
 <span class="normal">613</span>
 <span class="normal">614</span>
-<span class="normal">615</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;print&quot;</span><span class="p">)</span>
+<span class="normal">615</span>
+<span class="normal">616</span>
+<span class="normal">617</span>
+<span class="normal">618</span>
+<span class="normal">619</span>
+<span class="normal">620</span>
+<span class="normal">621</span>
+<span class="normal">622</span>
+<span class="normal">623</span>
+<span class="normal">624</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">(</span><span class="n">name</span><span class="o">=</span><span class="s2">&quot;print&quot;</span><span class="p">)</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--config_path&quot;</span><span class="p">,</span>
     <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -1067,7 +1067,7 @@ json: JSON formatted output.
 
 
 <h2 id="koality.cli.run" class="doc doc-heading">
-            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">config_path</span><span class="p">,</span> <span class="n">overwrites</span><span class="p">,</span> <span class="n">database_setup_variable</span><span class="p">)</span></code>
+            <code class="highlight language-python"><span class="n">run</span><span class="p">(</span><span class="n">config_path</span><span class="p">,</span> <span class="n">overwrites</span><span class="p">,</span> <span class="n">database_setup_variable</span><span class="p">,</span> <span class="n">verbose</span><span class="p">)</span></code>
 
 </h2>
 
@@ -1095,64 +1095,72 @@ comma-separated VAR=value pairs.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/cli.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">42</span>
-<span class="normal">43</span>
-<span class="normal">44</span>
-<span class="normal">45</span>
-<span class="normal">46</span>
-<span class="normal">47</span>
-<span class="normal">48</span>
-<span class="normal">49</span>
-<span class="normal">50</span>
-<span class="normal">51</span>
-<span class="normal">52</span>
-<span class="normal">53</span>
-<span class="normal">54</span>
-<span class="normal">55</span>
-<span class="normal">56</span>
-<span class="normal">57</span>
-<span class="normal">58</span>
-<span class="normal">59</span>
-<span class="normal">60</span>
-<span class="normal">61</span>
-<span class="normal">62</span>
-<span class="normal">63</span>
-<span class="normal">64</span>
-<span class="normal">65</span>
-<span class="normal">66</span>
-<span class="normal">67</span>
-<span class="normal">68</span>
-<span class="normal">69</span>
-<span class="normal">70</span>
-<span class="normal">71</span>
-<span class="normal">72</span>
-<span class="normal">73</span>
-<span class="normal">74</span>
-<span class="normal">75</span>
-<span class="normal">76</span>
-<span class="normal">77</span>
-<span class="normal">78</span>
-<span class="normal">79</span>
-<span class="normal">80</span>
-<span class="normal">81</span>
-<span class="normal">82</span>
-<span class="normal">83</span>
-<span class="normal">84</span>
-<span class="normal">85</span>
-<span class="normal">86</span>
-<span class="normal">87</span>
-<span class="normal">88</span>
-<span class="normal">89</span>
-<span class="normal">90</span>
-<span class="normal">91</span>
-<span class="normal">92</span>
-<span class="normal">93</span>
-<span class="normal">94</span>
-<span class="normal">95</span>
-<span class="normal">96</span>
-<span class="normal">97</span>
-<span class="normal">98</span>
-<span class="normal">99</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal"> 43</span>
+<span class="normal"> 44</span>
+<span class="normal"> 45</span>
+<span class="normal"> 46</span>
+<span class="normal"> 47</span>
+<span class="normal"> 48</span>
+<span class="normal"> 49</span>
+<span class="normal"> 50</span>
+<span class="normal"> 51</span>
+<span class="normal"> 52</span>
+<span class="normal"> 53</span>
+<span class="normal"> 54</span>
+<span class="normal"> 55</span>
+<span class="normal"> 56</span>
+<span class="normal"> 57</span>
+<span class="normal"> 58</span>
+<span class="normal"> 59</span>
+<span class="normal"> 60</span>
+<span class="normal"> 61</span>
+<span class="normal"> 62</span>
+<span class="normal"> 63</span>
+<span class="normal"> 64</span>
+<span class="normal"> 65</span>
+<span class="normal"> 66</span>
+<span class="normal"> 67</span>
+<span class="normal"> 68</span>
+<span class="normal"> 69</span>
+<span class="normal"> 70</span>
+<span class="normal"> 71</span>
+<span class="normal"> 72</span>
+<span class="normal"> 73</span>
+<span class="normal"> 74</span>
+<span class="normal"> 75</span>
+<span class="normal"> 76</span>
+<span class="normal"> 77</span>
+<span class="normal"> 78</span>
+<span class="normal"> 79</span>
+<span class="normal"> 80</span>
+<span class="normal"> 81</span>
+<span class="normal"> 82</span>
+<span class="normal"> 83</span>
+<span class="normal"> 84</span>
+<span class="normal"> 85</span>
+<span class="normal"> 86</span>
+<span class="normal"> 87</span>
+<span class="normal"> 88</span>
+<span class="normal"> 89</span>
+<span class="normal"> 90</span>
+<span class="normal"> 91</span>
+<span class="normal"> 92</span>
+<span class="normal"> 93</span>
+<span class="normal"> 94</span>
+<span class="normal"> 95</span>
+<span class="normal"> 96</span>
+<span class="normal"> 97</span>
+<span class="normal"> 98</span>
+<span class="normal"> 99</span>
+<span class="normal">100</span>
+<span class="normal">101</span>
+<span class="normal">102</span>
+<span class="normal">103</span>
+<span class="normal">104</span>
+<span class="normal">105</span>
+<span class="normal">106</span>
+<span class="normal">107</span>
+<span class="normal">108</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--config_path&quot;</span><span class="p">,</span>
     <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
@@ -1177,10 +1185,18 @@ comma-separated VAR=value pairs.</p>
     <span class="s2">&quot;(format: VAR1=value1,VAR2=value2). CLI options override env vars. &quot;</span>
     <span class="s2">&quot;Example: -dsv PROJECT_ID=my-gcp-project&quot;</span><span class="p">,</span>
 <span class="p">)</span>
+<span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
+    <span class="s2">&quot;--verbose&quot;</span><span class="p">,</span>
+    <span class="s2">&quot;-v&quot;</span><span class="p">,</span>
+    <span class="n">is_flag</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>
+    <span class="n">default</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+    <span class="n">help</span><span class="o">=</span><span class="s2">&quot;Enable verbose output, printing each check&#39;s SQL query before execution.&quot;</span><span class="p">,</span>
+<span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">run</span><span class="p">(</span>
     <span class="n">config_path</span><span class="p">:</span> <span class="n">Path</span><span class="p">,</span>
     <span class="n">overwrites</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
     <span class="n">database_setup_variable</span><span class="p">:</span> <span class="nb">tuple</span><span class="p">[</span><span class="nb">str</span><span class="p">,</span> <span class="o">...</span><span class="p">],</span>
+    <span class="n">verbose</span><span class="p">:</span> <span class="nb">bool</span> <span class="o">|</span> <span class="kc">None</span><span class="p">,</span>  <span class="c1"># noqa: FBT001</span>
 <span class="p">)</span> <span class="o">-&gt;</span> <span class="kc">None</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Run koality checks from a configuration file.</span>
 
@@ -1208,7 +1224,7 @@ comma-separated VAR=value pairs.</p>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="n">variables</span> <span class="o">=</span> <span class="n">_get_variables_with_env</span><span class="p">(</span><span class="n">database_setup_variable</span><span class="p">)</span>
     <span class="n">config</span> <span class="o">=</span> <span class="n">_load_config_with_overwrites</span><span class="p">(</span><span class="n">config_path</span><span class="p">,</span> <span class="n">overwrites</span><span class="p">,</span> <span class="n">variables</span><span class="p">)</span>
-    <span class="n">check_executor</span> <span class="o">=</span> <span class="n">CheckExecutor</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">)</span>
+    <span class="n">check_executor</span> <span class="o">=</span> <span class="n">CheckExecutor</span><span class="p">(</span><span class="n">config</span><span class="o">=</span><span class="n">config</span><span class="p">,</span> <span class="n">verbose</span><span class="o">=</span><span class="n">verbose</span><span class="p">)</span>
     <span class="n">_</span> <span class="o">=</span> <span class="n">check_executor</span><span class="p">()</span>
 </code></pre></div></td></tr></table></div>
             </details>
@@ -1243,16 +1259,7 @@ without executing any checks. Useful for CI/CD pipelines and debugging.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/cli.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">491</span>
-<span class="normal">492</span>
-<span class="normal">493</span>
-<span class="normal">494</span>
-<span class="normal">495</span>
-<span class="normal">496</span>
-<span class="normal">497</span>
-<span class="normal">498</span>
-<span class="normal">499</span>
-<span class="normal">500</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">500</span>
 <span class="normal">501</span>
 <span class="normal">502</span>
 <span class="normal">503</span>
@@ -1272,7 +1279,16 @@ without executing any checks. Useful for CI/CD pipelines and debugging.</p>
 <span class="normal">517</span>
 <span class="normal">518</span>
 <span class="normal">519</span>
-<span class="normal">520</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
+<span class="normal">520</span>
+<span class="normal">521</span>
+<span class="normal">522</span>
+<span class="normal">523</span>
+<span class="normal">524</span>
+<span class="normal">525</span>
+<span class="normal">526</span>
+<span class="normal">527</span>
+<span class="normal">528</span>
+<span class="normal">529</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@cli</span><span class="o">.</span><span class="n">command</span><span class="p">()</span>
 <span class="nd">@click</span><span class="o">.</span><span class="n">option</span><span class="p">(</span>
     <span class="s2">&quot;--config_path&quot;</span><span class="p">,</span>
     <span class="n">required</span><span class="o">=</span><span class="kc">True</span><span class="p">,</span>

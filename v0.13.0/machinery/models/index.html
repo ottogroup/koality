@@ -19,7 +19,7 @@
       
       
       <link rel="icon" href="../../assets/icon.png">
-      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.5">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.6">
     
     
       
@@ -897,10 +897,7 @@
 
               <details class="mkdocstrings-source">
                 <summary>Source code in <code>src/koality/models.py</code></summary>
-                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">341</span>
-<span class="normal">342</span>
-<span class="normal">343</span>
-<span class="normal">344</span>
+                <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">344</span>
 <span class="normal">345</span>
 <span class="normal">346</span>
 <span class="normal">347</span>
@@ -1074,7 +1071,10 @@
 <span class="normal">515</span>
 <span class="normal">516</span>
 <span class="normal">517</span>
-<span class="normal">518</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="k">class</span><span class="w"> </span><span class="nc">Config</span><span class="p">(</span><span class="n">BaseModel</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Root configuration model for koality check execution.&quot;&quot;&quot;</span>
 
     <span class="n">name</span><span class="p">:</span> <span class="nb">str</span>
@@ -1294,10 +1294,7 @@ filters override individual filter entries rather than replacing the whole dict.
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">350</span>
-<span class="normal">351</span>
-<span class="normal">352</span>
-<span class="normal">353</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">353</span>
 <span class="normal">354</span>
 <span class="normal">355</span>
 <span class="normal">356</span>
@@ -1346,7 +1343,10 @@ filters override individual filter entries rather than replacing the whole dict.
 <span class="normal">399</span>
 <span class="normal">400</span>
 <span class="normal">401</span>
-<span class="normal">402</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
+<span class="normal">402</span>
+<span class="normal">403</span>
+<span class="normal">404</span>
+<span class="normal">405</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;before&quot;</span><span class="p">)</span>
 <span class="nd">@classmethod</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">propagate_defaults_to_checks</span><span class="p">(</span><span class="bp">cls</span><span class="p">,</span> <span class="n">data</span><span class="p">:</span> <span class="nb">dict</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="nb">dict</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Merge defaults and check_bundle.defaults into each check before validation.</span>
@@ -1424,10 +1424,7 @@ identifier-type filters which are allowed to omit a value (used for naming).</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">477</span>
-<span class="normal">478</span>
-<span class="normal">479</span>
-<span class="normal">480</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">480</span>
 <span class="normal">481</span>
 <span class="normal">482</span>
 <span class="normal">483</span>
@@ -1465,7 +1462,10 @@ identifier-type filters which are allowed to omit a value (used for naming).</p>
 <span class="normal">515</span>
 <span class="normal">516</span>
 <span class="normal">517</span>
-<span class="normal">518</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+<span class="normal">518</span>
+<span class="normal">519</span>
+<span class="normal">520</span>
+<span class="normal">521</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">validate_filter_values_complete</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate that all filters in checks have column and value set.</span>
 
@@ -1534,10 +1534,7 @@ every check has an identifier filter.</p>
 
             <details class="mkdocstrings-source">
               <summary>Source code in <code>src/koality/models.py</code></summary>
-              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">426</span>
-<span class="normal">427</span>
-<span class="normal">428</span>
-<span class="normal">429</span>
+              <div class="highlight"><table class="highlighttable"><tr><td class="linenos"><div class="linenodiv"><pre><span></span><span class="normal">429</span>
 <span class="normal">430</span>
 <span class="normal">431</span>
 <span class="normal">432</span>
@@ -1583,7 +1580,10 @@ every check has an identifier filter.</p>
 <span class="normal">472</span>
 <span class="normal">473</span>
 <span class="normal">474</span>
-<span class="normal">475</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
+<span class="normal">475</span>
+<span class="normal">476</span>
+<span class="normal">477</span>
+<span class="normal">478</span></pre></div></td><td class="code"><div><pre><span></span><code><span class="nd">@model_validator</span><span class="p">(</span><span class="n">mode</span><span class="o">=</span><span class="s2">&quot;after&quot;</span><span class="p">)</span>
 <span class="k">def</span><span class="w"> </span><span class="nf">validate_identifier_consistency</span><span class="p">(</span><span class="bp">self</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">Self</span><span class="p">:</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;Validate identifier filter consistency based on identifier_format.</span>
 
