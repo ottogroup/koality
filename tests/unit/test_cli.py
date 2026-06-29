@@ -231,6 +231,69 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert "--overwrites" in result.output or "-o" in result.output
 
+    def test_run_help_shows_verbose_option(self, runner: CliRunner) -> None:
+        """Test that run command help shows verbose option."""
+        result = runner.invoke(cli, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "--verbose" in result.output or "-v" in result.output
+
+    def test_run_verbose_flag_accepted(self, runner: CliRunner, valid_config_file: Path) -> None:
+        """Test that --verbose flag is recognized (exit code is not a Click usage error)."""
+        result = runner.invoke(cli, ["run", "--config_path", str(valid_config_file), "--verbose"])
+        assert result.exit_code != 2, "--verbose caused a Click usage error; flag may not be registered"
+
+    def test_run_verbose_short_flag_accepted(self, runner: CliRunner, valid_config_file: Path) -> None:
+        """Test that -v short flag is recognized (exit code is not a Click usage error)."""
+        result = runner.invoke(cli, ["run", "--config_path", str(valid_config_file), "-v"])
+        assert result.exit_code != 2, "-v caused a Click usage error; flag may not be registered"
+
+    def test_run_uses_config_verbose_when_flag_not_set(
+        self,
+        runner: CliRunner,
+        tmp_path: Path,
+        monkeypatch: pytest.MonkeyPatch,
+    ) -> None:
+        """Test that run falls back to defaults.verbose when no CLI flag is provided."""
+        config_path = tmp_path / "verbose_config.yaml"
+        config_path.write_text(
+            dedent("""\
+            name: verbose_config
+            database_setup: ""
+            database_accessor: memory
+
+            defaults:
+              monitor_only: true
+              verbose: true
+
+            check_bundles:
+              - name: test_bundle
+                checks:
+                  - check_type: CountCheck
+                    table: test_table
+                    check_column: id
+                    lower_threshold: 0
+                    upper_threshold: 100
+            """),
+        )
+
+        captured: dict[str, object] = {}
+
+        class DummyExecutor:
+            def __init__(self, config: object, verbose: bool | None = None) -> None:  # noqa: FBT001
+                captured["config_verbose"] = config.defaults.verbose
+                captured["verbose"] = verbose
+
+            def __call__(self) -> list[object]:
+                return []
+
+        monkeypatch.setattr("koality.cli.CheckExecutor", DummyExecutor)
+
+        result = runner.invoke(cli, ["run", "--config_path", str(config_path)])
+
+        assert result.exit_code == 0
+        assert captured["config_verbose"] is True
+        assert captured["verbose"] is None
+
 
 class TestOverwrites:
     """Tests for the overwrites functionality."""

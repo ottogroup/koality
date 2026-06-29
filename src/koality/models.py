@@ -178,6 +178,7 @@ class _LocalDefaults(_Defaults):
 
 class _GlobalDefaults(_Defaults):
     monitor_only: bool = False
+    verbose: bool = False
     result_table: str | None = None
     identifier_format: IdentifierFormat = "identifier"
     # Placeholder used when an identifier filter has no concrete value (e.g., naming-only filters)
