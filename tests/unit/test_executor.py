@@ -1,9 +1,11 @@
 """Unit tests for CheckExecutor."""
 
+import logging
 import math
 from pathlib import Path
 from textwrap import dedent
 
+import duckdb
 import pytest
 from pydantic_yaml import parse_yaml_raw_as
 
@@ -235,3 +237,78 @@ def test_check_level_monitor_only_overrides_bundle() -> None:
     assert bundle.defaults.monitor_only is False
     check = bundle.checks[0]
     assert check.monitor_only is True
+
+
+@pytest.mark.unit
+def test_verbose_mode_logs_query(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that verbose=True causes the SQL query to be logged at DEBUG level."""
+    content = dedent(
+        """
+        name: test-verbose
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: True
+
+        check_bundles:
+          - name: bundle-verbose
+            checks:
+              - check_type: CountCheck
+                table: test_table
+                check_column: "*"
+                lower_threshold: 0
+                upper_threshold: 1000
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE TABLE test_table (id INTEGER)")
+    conn.execute("INSERT INTO test_table VALUES (1), (2), (3)")
+
+    with caplog.at_level(logging.DEBUG, logger="koality.executor"):
+        executor = CheckExecutor(config=config, duckdb_client=conn, verbose=True)
+        executor()
+
+    query_logs = [r.message for r in caplog.records if "Query" in r.message]
+    assert query_logs, "Expected at least one DEBUG log containing the SQL query"
+    assert any("SELECT" in msg for msg in query_logs)
+
+
+@pytest.mark.unit
+def test_verbose_mode_off_does_not_log_query(caplog: pytest.LogCaptureFixture) -> None:
+    """Test that verbose=False (default) does not emit DEBUG query logs."""
+    content = dedent(
+        """
+        name: test-no-verbose
+
+        database_setup: ""
+        database_accessor: ""
+
+        defaults:
+          monitor_only: True
+
+        check_bundles:
+          - name: bundle-no-verbose
+            checks:
+              - check_type: CountCheck
+                table: test_table
+                check_column: "*"
+                lower_threshold: 0
+                upper_threshold: 1000
+        """,
+    ).strip()
+
+    config = parse_yaml_raw_as(Config, content)
+    conn = duckdb.connect(":memory:")
+    conn.execute("CREATE TABLE test_table (id INTEGER)")
+    conn.execute("INSERT INTO test_table VALUES (1)")
+
+    with caplog.at_level(logging.DEBUG, logger="koality.executor"):
+        executor = CheckExecutor(config=config, duckdb_client=conn)
+        executor()
+
+    query_logs = [r.message for r in caplog.records if "Query" in r.message]
+    assert not query_logs, "Expected no DEBUG query logs when verbose=False"

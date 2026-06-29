@@ -102,9 +102,13 @@ class CheckExecutor:
         self,
         config: Config,
         duckdb_client: duckdb.DuckDBPyConnection | None = None,
+        verbose: bool = False,  # noqa: FBT001, FBT002
         **kwargs: object,
     ) -> None:
         """Initialize the check executor with configuration and optional DuckDB client."""
+        self.verbose = verbose
+        if verbose:
+            log.setLevel(logging.DEBUG)
         self.config = config
         if duckdb_client is not None:
             self.duckdb_client = duckdb_client
@@ -450,6 +454,9 @@ class CheckExecutor:
             {final_where_clause}
             """  # noqa: S608
 
+            if self.verbose:
+                log.debug("Fetching data for table %s\nQuery:\n%s", table, select_query)
+
             try:
                 # Execute the query to get the data as a DuckDB relation
                 relation = execute_query(  # noqa: F841
@@ -468,7 +475,7 @@ class CheckExecutor:
                 # Decide if we should raise the error or continue
                 raise DatabaseError(msg) from e
 
-    def execute_checks(self) -> None:
+    def execute_checks(self) -> None:  # noqa: C901
         """Instantiate and execute all checks.
 
         When walking through the different checks, parameters are updated using global
@@ -514,6 +521,8 @@ class CheckExecutor:
             if data_check_result:
                 results.append(data_check_result)
             else:
+                if self.verbose:
+                    log.debug("Check: %s\nQuery:\n%s", check_instance, check_instance.query)
                 results.append(check_instance.check(self.duckdb_client))
 
         for check in self.checks:

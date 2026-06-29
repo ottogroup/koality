@@ -65,10 +65,18 @@ def cli() -> None:
     "(format: VAR1=value1,VAR2=value2). CLI options override env vars. "
     "Example: -dsv PROJECT_ID=my-gcp-project",
 )
+@click.option(
+    "--verbose",
+    "-v",
+    is_flag=True,
+    default=False,
+    help="Enable verbose output, printing each check's SQL query before execution.",
+)
 def run(
     config_path: Path,
     overwrites: tuple[str, ...],
     database_setup_variable: tuple[str, ...],
+    verbose: bool,  # noqa: FBT001
 ) -> None:
     """Run koality checks from a configuration file.
 
@@ -96,7 +104,7 @@ def run(
     """
     variables = _get_variables_with_env(database_setup_variable)
     config = _load_config_with_overwrites(config_path, overwrites, variables)
-    check_executor = CheckExecutor(config=config)
+    check_executor = CheckExecutor(config=config, verbose=verbose)
     _ = check_executor()
 
 

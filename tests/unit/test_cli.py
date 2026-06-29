@@ -231,6 +231,22 @@ class TestRunCommand:
         assert result.exit_code == 0
         assert "--overwrites" in result.output or "-o" in result.output
 
+    def test_run_help_shows_verbose_option(self, runner: CliRunner) -> None:
+        """Test that run command help shows verbose option."""
+        result = runner.invoke(cli, ["run", "--help"])
+        assert result.exit_code == 0
+        assert "--verbose" in result.output or "-v" in result.output
+
+    def test_run_verbose_flag_accepted(self, runner: CliRunner, valid_config_file: Path) -> None:
+        """Test that --verbose flag is recognized (exit code is not a Click usage error)."""
+        result = runner.invoke(cli, ["run", "--config_path", str(valid_config_file), "--verbose"])
+        assert result.exit_code != 2, "--verbose caused a Click usage error; flag may not be registered"
+
+    def test_run_verbose_short_flag_accepted(self, runner: CliRunner, valid_config_file: Path) -> None:
+        """Test that -v short flag is recognized (exit code is not a Click usage error)."""
+        result = runner.invoke(cli, ["run", "--config_path", str(valid_config_file), "-v"])
+        assert result.exit_code != 2, "-v caused a Click usage error; flag may not be registered"
+
 
 class TestOverwrites:
     """Tests for the overwrites functionality."""
