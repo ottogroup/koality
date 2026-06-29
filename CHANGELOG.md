@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.13.1] - 2026-06-29
+
+### Added
+
+- Add `--verbose`/`-v` CLI flag and `verbose` YAML default to log the SQL queries executed by each check.
+
 ## [0.13.0] - 2026-03-18
 
 ### Fixed
