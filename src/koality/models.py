@@ -302,6 +302,8 @@ class _MatchRateCheck(_Check):
     join_columns: list[str] | None = None
     join_columns_left: list[str] | None = None
     join_columns_right: list[str] | None = None
+    filters_left: dict[str, FilterConfig] | None = None
+    filters_right: dict[str, FilterConfig] | None = None
 
     @model_validator(mode="after")
     def validate_join_columns(self) -> Self:

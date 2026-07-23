@@ -4,6 +4,7 @@ import duckdb
 import pytest
 
 from koality.checks import MatchRateCheck
+from koality.models import _MatchRateCheck
 
 pytestmark = pytest.mark.integration
 
@@ -441,3 +442,60 @@ def test_match_rate_check_one_table_empty(
     assert result["METRIC_NAME"] == "data_exists"
     assert result["DATE"] == "2023-01-01"
     assert result["IDENTIFIER"] == "shop_code=SHOP001"
+
+
+def test_match_rate_check_filters_left_right_via_model(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that filters_left and filters_right are correctly passed through the Pydantic model.
+
+    Simulates the YAML → Pydantic model → executor → MatchRateCheck flow.
+    Uses different dates for left and right tables via filters_left / filters_right.
+    """
+    config = _MatchRateCheck(
+        check_type="MatchRateCheck",
+        left_table="purchase_order",
+        right_table="skufeed",
+        join_columns=["product_number"],
+        check_column="product_number",
+        filters_left={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+        filters_right={
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+    )
+    kwargs = config.model_dump(exclude={"check_type"}, exclude_none=True)
+    kwargs["database_accessor"] = ""
+    kwargs["database_provider"] = None
+    kwargs["identifier_format"] = "identifier"
+    kwargs["identifier_placeholder"] = "ALL"
+    check = MatchRateCheck(**kwargs)
+    result = check(duckdb_client)
+    # 4 / 5 product_numbers of SHOP001 on 2023-01-01 found in skufeed
+    assert result["VALUE"] == 0.8
+
+
+def test_match_rate_check_different_dates_per_table(duckdb_client: duckdb.DuckDBPyConnection) -> None:
+    """Test that different date filters can be applied to left and right tables.
+
+    Left table filtered to 2023-01-02 (1 row: SHOP001-0040),
+    right table filtered to 2023-01-01 (contains SHOP001-0040 → match rate 1.0).
+    """
+    check = MatchRateCheck(
+        database_accessor="",
+        database_provider=None,
+        left_table="purchase_order",
+        right_table="skufeed",
+        join_columns=["product_number"],
+        check_column="product_number",
+        filters_left={
+            "shop_id": {"column": "shop_code", "value": "SHOP001", "type": "identifier"},
+            "date": {"column": "DATE", "value": "2023-01-02", "type": "date"},
+        },
+        filters_right={
+            "date": {"column": "DATE", "value": "2023-01-01", "type": "date"},
+        },
+    )
+    result = check(duckdb_client)
+    # SHOP001-0040 on 2023-01-02 left; skufeed on 2023-01-01 has SHOP001-0040 → match rate 1.0
+    assert result["VALUE"] == 1.0
