@@ -16,6 +16,12 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.13.2] - 2026-07-23
+
+### Added
+
+- Add `filters_left` and `filters_right` to `MatchRateCheck` YAML config
+
 ## [0.13.1] - 2026-06-29
 
 ### Added
@@ -212,7 +218,9 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.13.0...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.13.2...HEAD
+[0.13.2]: https://github.com/ottogroup/koality/compare/v0.13.1...v0.13.2
+[0.13.1]: https://github.com/ottogroup/koality/compare/v0.13.0...v0.13.1
 [0.13.0]: https://github.com/ottogroup/koality/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/ottogroup/koality/compare/v0.11.0...v0.12.0
 [0.11.0]: https://github.com/ottogroup/koality/compare/v0.10.0...v0.11.0
