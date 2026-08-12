@@ -33,6 +33,7 @@ Purpose: Guide Copilot to produce accurate, minimal, and maintainable changes fo
 - Tests live in `tests/unit` and `tests/integration` with pytest markers
 - Integration tests use in-memory DuckDB fixtures from `tests/conftest.py`
 - When adding features, include focused unit tests and, when SQL/duckdb behavior is involved, an integration test
+- `tests/live/` is a sanctioned, opt-in exception to the "no external services" rule below: real BigQuery tests, marked `bigquery_live`, excluded from `poe test` and skipped unless `KOALITY_BIGQUERY_LIVE=1` plus GCP credentials are present
 
 ## Coding style and constraints
 - Make the smallest possible change; do not refactor unrelated code

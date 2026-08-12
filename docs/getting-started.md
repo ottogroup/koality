@@ -72,7 +72,7 @@ check_bundles:
 ```yaml
 name: bigquery_checks
 database_setup: |
-  INSTALL bigquery;
+  INSTALL bigquery FROM community;
   LOAD bigquery;
   ATTACH 'project=my-gcp-project' AS bq (TYPE bigquery, READ_ONLY);
 database_accessor: bq
