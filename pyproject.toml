@@ -68,7 +68,6 @@ Releases = "https://github.com/ottogroup/koality/releases"
 dev = [
     "deptry>=0.24.0,<1",
     "poethepoet>=0.37.0,<1",
-    "pysentry-rs>=0.3.12,<1",
     "pytest>=7.2.0,<10",
     "pytest-cov>=4.0.0,<8",
     "pytest-xdist>=3.0.2,<4",
@@ -126,7 +125,7 @@ lint = [
 ]
 type = "ty check src/koality"
 # Security and dependency checks.
-check_vulnerable_dependencies = "pysentry-rs --sources pypa,osv,pypi"
+check_vulnerable_dependencies = "uv audit"
 check_unused_dependencies = "deptry src/koality"
 check_githubactions = "zizmor .github/workflows/"
 # Testing.
