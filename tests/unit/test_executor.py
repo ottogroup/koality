@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Unit tests for CheckExecutor."""
 
 import logging

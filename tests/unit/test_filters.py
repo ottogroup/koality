@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Unit tests for filter parsing functionality."""
 
 import datetime as dt

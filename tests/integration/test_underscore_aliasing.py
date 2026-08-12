@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Integration test for underscore aliasing of nested column names."""
 
 import duckdb

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """koality is a library for checks on tables for data quality monitoring (DQM)."""
 
 from koality.executor import CheckExecutor

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Module containing the actual check execution logic."""
 
 import datetime as dt

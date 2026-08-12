@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Integration test for executor fetch with rolling windows."""
 
 import duckdb

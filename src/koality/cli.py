@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Command-line interface for Koality.
 
 This module provides the CLI for running, validating, and inspecting

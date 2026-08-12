@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Unit tests ensuring identifier_placeholder is respected by checks."""
 
 import datetime as dt

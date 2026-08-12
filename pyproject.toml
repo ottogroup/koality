@@ -93,10 +93,14 @@ line-length = 120
 select = ["ALL"]
 ignore = [
     "PLR0913",  # Too many arguments - check classes need many parameters
+    "PLR0917",  # Too many positional arguments - check classes need many parameters
     "TD002",  # Missing author in TODO
     "TD003",  # Missing issue link for TODO
     "FIX002",  # Line contains TODO
 ]
+
+[tool.ruff.lint.flake8-copyright]
+author = "koality maintainers"
 
 [tool.ruff.lint.per-file-ignores]
 "src/koality/checks.py" = ["S608"]
@@ -136,7 +140,7 @@ docs_serve = "mkdocs serve"
 koality = "koality.cli:cli"
 
 [build-system]
-requires = ["uv_build>=0.9.21,<0.12.0"]
+requires = ["uv_build>=0.9.21,<0.13.0"]
 build-backend = "uv_build"
 
 [tool.deptry]

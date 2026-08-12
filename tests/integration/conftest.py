@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Pytest fixtures for integration tests."""
 
 from collections.abc import Iterator

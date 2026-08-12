@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Pydantic models for koality configuration validation."""
 
 import math
