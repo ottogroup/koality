@@ -102,7 +102,7 @@ name: My Data Quality Checks
 
 # Database connection setup - executed before running checks
 database_setup: |
-  INSTALL bigquery;
+  INSTALL bigquery FROM community;
   LOAD bigquery;
   ATTACH 'project=${PROJECT_ID}' AS bq (TYPE bigquery, READ_ONLY);
 

@@ -110,6 +110,7 @@ log_level = "DEBUG"
 markers = [
     "unit: unit tests",
     "integration: integration tests",
+    "bigquery_live: live BigQuery tests requiring real GCP credentials (opt-in, excluded by default)",
 ]
 testpaths = ["tests"]
 
@@ -131,7 +132,8 @@ check_githubactions = "zizmor .github/workflows/"
 # Testing.
 test_unit = "pytest -m unit"
 test_integration = "pytest -m integration"
-test = "pytest" # runs all tests
+test = "pytest -m \"not bigquery_live\"" # runs unit + integration, excludes opt-in live BigQuery tests
+test_bigquery_live = "pytest -m bigquery_live"
 # Docs
 docs_serve = "mkdocs serve"
 

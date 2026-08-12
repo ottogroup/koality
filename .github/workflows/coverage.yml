@@ -23,11 +23,20 @@ jobs:
     runs-on: "ubuntu-latest"
     permissions:
       contents: read
+      id-token: write
     steps:
       - name: Acquire sources
         uses: actions/checkout@v7
         with:
           persist-credentials: false
+
+      - name: Authenticate to Google Cloud via Workload Identity Federation
+        id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ secrets.BIGQUERY_WIF_PROVIDER }}
+          service_account: ${{ secrets.BIGQUERY_WIF_SERVICE_ACCOUNT }}
+          token_format: access_token
 
       - uses: astral-sh/setup-uv@v7
         with:
@@ -37,6 +46,13 @@ jobs:
         run: uv sync
 
       - name: Run tests, with coverage
+        env:
+          KOALITY_BIGQUERY_LIVE: "1"
+          KOALITY_BIGQUERY_PROJECT: ${{ secrets.BIGQUERY_TEST_PROJECT }}
+          KOALITY_BIGQUERY_DATASET: ${{ vars.BIGQUERY_TEST_DATASET }}
+          KOALITY_BIGQUERY_TABLE: ${{ vars.BIGQUERY_TEST_TABLE }}
+          KOALITY_BIGQUERY_COLUMN: ${{ vars.BIGQUERY_TEST_COLUMN }}
+          KOALITY_BIGQUERY_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
         run: |
           uv run pytest --cov=koality tests/
           uv run coverage xml

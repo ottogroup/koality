@@ -68,6 +68,33 @@ poe test_unit
 poe test_integration
 ```
 
+#### Live BigQuery Tests (opt-in)
+
+`tests/live/` contains tests that run against a real BigQuery project instead
+of DuckDB's in-memory engine. They are excluded from `poe test` and skipped
+automatically unless explicitly enabled, since they require real GCP
+credentials, a fixture table, and may incur BigQuery costs.
+
+To run them locally, authenticate with [Application Default
+Credentials](https://cloud.google.com/docs/authentication/application-default-credentials)
+(e.g. `gcloud auth application-default login`, or a Workload Identity
+Federation-derived credential), then:
+
+```bash
+export KOALITY_BIGQUERY_LIVE=1
+export KOALITY_BIGQUERY_PROJECT=my-gcp-project
+export KOALITY_BIGQUERY_DATASET=my_dataset
+export KOALITY_BIGQUERY_TABLE=my_table
+export KOALITY_BIGQUERY_COLUMN=my_column
+
+poe test_bigquery_live
+```
+
+In CI, this suite runs as part of the `Tests` workflow (single `ubuntu-latest`
++ Python 3.14 leg only, to avoid running it 5x per push across the full OS/
+Python matrix) and the `Coverage` workflow, authenticating through Workload
+Identity Federation rather than a static service account key.
+
 ### Code Quality
 
 We use [Ruff](https://docs.astral.sh/ruff/) for linting and formatting:
