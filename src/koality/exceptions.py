@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Custom exceptions for koality."""
 
 

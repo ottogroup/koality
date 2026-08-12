@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Utility functions for koality data quality checks."""
 
 import contextlib

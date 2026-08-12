@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Integration test for CheckExecutor to verify table name quoting when fetching data into memory."""
 
 import duckdb

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Unit tests for utility functions."""
 
 import datetime as dt

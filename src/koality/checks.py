@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Module containing data quality check classes."""
 
 import abc

@@ -1,3 +1,4 @@
+# Copyright (c) 2026 koality maintainers
 """Integration tests for RelCountChangeCheck."""
 
 import duckdb
