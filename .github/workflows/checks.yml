@@ -20,7 +20,7 @@ concurrency:
 
 env:
   OS: "ubuntu-latest"
-  PYTHON: "3.14"
+  PYTHON: "3.15"
 
 jobs:
   checks:
