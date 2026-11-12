@@ -1,6 +1,6 @@
 [project]
 name = "koality"
-version = "0.13.4"
+version = "0.14.0"
 authors = [
     { name = "Team PiT @ Otto Group data.works GmbH" },
     { name = "Norbert Maager" },

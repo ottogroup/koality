@@ -16,7 +16,7 @@ Types of changes:
 
 ## [Unreleased]
 
-## [0.13.4] - 2026-11-12
+## [0.14.0] - 2026-11-12
 
 ### Changed
 
@@ -238,8 +238,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.13.4...HEAD
-[0.13.4]: https://github.com/ottogroup/koality/compare/v0.13.3...v0.13.4
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.14.0...HEAD
+[0.14.0]: https://github.com/ottogroup/koality/compare/v0.13.3...v0.14.0
 [0.13.3]: https://github.com/ottogroup/koality/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/ottogroup/koality/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/ottogroup/koality/compare/v0.13.0...v0.13.1
