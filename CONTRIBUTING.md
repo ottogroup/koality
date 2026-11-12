@@ -91,7 +91,7 @@ poe test_bigquery_live
 ```
 
 In CI, this suite runs as part of the `Tests` workflow (single `ubuntu-latest`
-+ Python 3.14 leg only, to avoid running it 5x per push across the full OS/
++ Python 3.15 leg only, to avoid running it 5x per push across the full OS/
 Python matrix) and the `Coverage` workflow, authenticating through Workload
 Identity Federation rather than a static service account key.
 
