@@ -18,6 +18,10 @@ Types of changes:
 
 ## [0.14.0] - 2026-11-12
 
+### Added
+
+- Support Python 3.15: add the trove classifier and run the test suite against 3.15 in CI.
+
 ### Changed
 
 - Small patching 2026/11: raise the `uv_build` upper bound to `<0.14.0`, refresh `uv.lock` within current majors and bump `astral-sh/setup-uv` to `v10.3.3`.
