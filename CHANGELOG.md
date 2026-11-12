@@ -26,7 +26,7 @@ Types of changes:
 
 - Small patching 2026/11: raise the `uv_build` upper bound to `<0.14.0`, refresh `uv.lock` within current majors and bump `astral-sh/setup-uv` to `v10.3.3`.
 - Declare the license as an SPDX expression (`license = "MIT"` and `license-files`) per PEP 639 and drop the deprecated license classifier, which silences the build warning.
-- CI: run the macOS and Windows test legs, and the type, lint, checks and coverage workflows, on Python 3.15.
+- CI: run the macOS and Windows test legs, and the type, lint, checks, coverage and release workflows, on Python 3.15.
 
 ### Fixed
 
