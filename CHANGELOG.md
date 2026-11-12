@@ -16,6 +16,10 @@ Types of changes:
 
 ## [Unreleased]
 
+### Changed
+
+- Small patching 2026/11: raise the `uv_build` upper bound to `<0.14.0`, refresh `uv.lock` within current majors and bump `astral-sh/setup-uv` to `v10.3.3`.
+
 ## [0.13.3] - 2026-08-12
 
 ### Fixed

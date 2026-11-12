@@ -38,7 +38,7 @@ jobs:
           service_account: ${{ secrets.BIGQUERY_WIF_SERVICE_ACCOUNT }}
           token_format: access_token
 
-      - uses: astral-sh/setup-uv@v7
+      - uses: astral-sh/setup-uv@v10.3.3
         with:
           python-version: ${{ env.PYTHON }}
 
