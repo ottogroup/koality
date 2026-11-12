@@ -9,7 +9,8 @@ authors = [
 ]
 description = "Library for data checks and data quality monitoring based on duckdb."
 readme = "README.md"
-license = { file = "LICENSE.md" }
+license = "MIT"
+license-files = ["LICENSE.md"]
 keywords = [
     "data-quality",
     "data-validation",
@@ -34,7 +35,6 @@ classifiers = [
     "Environment :: Console",
     "Intended Audience :: Developers",
     "Intended Audience :: Science/Research",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",

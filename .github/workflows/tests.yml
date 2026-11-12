@@ -27,9 +27,9 @@ jobs:
         python-version: ["3.12", "3.13", "3.14", "3.15"]
         include:
           - os: "macos-latest"
-            python-version: "3.14"
+            python-version: "3.15"
           - os: "windows-latest"
-            python-version: "3.14"
+            python-version: "3.15"
     name: Python ${{ matrix.python-version }} on OS ${{ matrix.os }}
     steps:
       - name: Acquire sources
