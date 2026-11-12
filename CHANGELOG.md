@@ -16,9 +16,17 @@ Types of changes:
 
 ## [Unreleased]
 
+## [0.13.4] - 2026-11-12
+
 ### Changed
 
 - Small patching 2026/11: raise the `uv_build` upper bound to `<0.14.0`, refresh `uv.lock` within current majors and bump `astral-sh/setup-uv` to `v10.3.3`.
+
+### Fixed
+
+- Resolve type errors reported by `ty` 0.0.101 in the config models: split shared check defaults into `_CheckDefaults`,
+  share fields of the values-in-set checks via `_BaseValuesInSetCheck`, declare `check_type` on `RelCountChangeCheck`
+  and `IqrOutlierCheck`, and mark `persist_results` as a property.
 
 ## [0.13.3] - 2026-08-12
 
@@ -230,7 +238,8 @@ Types of changes:
 - GitHub Actions workflows for CI/CD and releases
 - Use common `defaults` key instead of `global_defaults` and `default_args`
 
-[Unreleased]: https://github.com/ottogroup/koality/compare/v0.13.3...HEAD
+[Unreleased]: https://github.com/ottogroup/koality/compare/v0.13.4...HEAD
+[0.13.4]: https://github.com/ottogroup/koality/compare/v0.13.3...v0.13.4
 [0.13.3]: https://github.com/ottogroup/koality/compare/v0.13.2...v0.13.3
 [0.13.2]: https://github.com/ottogroup/koality/compare/v0.13.1...v0.13.2
 [0.13.1]: https://github.com/ottogroup/koality/compare/v0.13.0...v0.13.1
