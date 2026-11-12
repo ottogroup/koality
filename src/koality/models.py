@@ -167,12 +167,15 @@ class _Defaults(BaseModel):
         return self
 
 
-class _LocalDefaults(_Defaults):
+class _CheckDefaults(_Defaults):
     monitor_only: bool = False
-    check_type: CHECK_TYPE | None = None
     check_column: str | None = None
     lower_threshold: float = -math.inf
     upper_threshold: float = math.inf
+
+
+class _LocalDefaults(_CheckDefaults):
+    check_type: CHECK_TYPE | None = None
     right_table: str | None = None
     left_table: str | None = None
 
@@ -186,16 +189,15 @@ class _GlobalDefaults(_Defaults):
     identifier_placeholder: str = "ALL"
 
     @computed_field
+    @property
     def persist_results(self) -> bool:
         return self.result_table is not None
 
     log_path: str | None = None
 
 
-class _Check(_LocalDefaults):
+class _Check(_CheckDefaults):
     """Base model for all check configurations."""
-
-    check_type: CHECK_TYPE
 
     @model_validator(mode="after")
     def validate_filters_have_columns(self) -> Self:
@@ -243,14 +245,19 @@ class _RegexMatchCheck(_SingleTableCheck):
     regex_to_match: str
 
 
-class _ValuesInSetCheck(_SingleTableCheck):
-    """Config model for ValuesInSetCheck."""
+class _BaseValuesInSetCheck(_SingleTableCheck):
+    """Shared fields for values-in-set check configurations."""
 
-    check_type: Literal["ValuesInSetCheck"]
     value_set: set[str | bool | int]
 
 
-class _RollingValuesInSetCheck(_ValuesInSetCheck):
+class _ValuesInSetCheck(_BaseValuesInSetCheck):
+    """Config model for ValuesInSetCheck."""
+
+    check_type: Literal["ValuesInSetCheck"]
+
+
+class _RollingValuesInSetCheck(_BaseValuesInSetCheck):
     """Config model for RollingValuesInSetCheck."""
 
     check_type: Literal["RollingValuesInSetCheck"]
@@ -327,12 +334,14 @@ class _MatchRateCheck(_Check):
 class _RelCountChangeCheck(_SingleTableCheck):
     """Config model for RelCountChangeCheck."""
 
+    check_type: Literal["RelCountChangeCheck"]
     rolling_days: int = Field(ge=1)
 
 
 class _IqrOutlierCheck(_SingleTableCheck):
     """Config model for IqrOutlierCheck."""
 
+    check_type: Literal["IqrOutlierCheck"]
     interval_days: int = Field(ge=1)
     how: Literal["both", "upper", "lower"]
     iqr_factor: float = Field(gt=0)
